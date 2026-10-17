@@ -1130,7 +1130,10 @@
         draw();
         return;
       }
-      if (typed.length < 3) { typed += key; draw(); }
+      if (typed.length < 3) {
+        typed += key; draw();
+        if (parseInt(typed, 10) === vals[pos]) onKey('ok');
+      }
     }
 
     var side = h('div', { class: 'ladder-side' });
@@ -1405,7 +1408,10 @@
       if (phase === 'wait') return;
       if (key === 'del') { typed = typed.slice(0, -1); drawEq(false); return; }
       if (key !== 'ok') {
-        if (typed.length < 3) { typed += key; drawEq(false); }
+        if (typed.length < 3) {
+          typed += key; drawEq(false);
+          if (parseInt(typed, 10) === q.answer) onKey('ok');
+        }
         return;
       }
       if (!typed) return;
@@ -1685,7 +1691,13 @@
     function onKey(key) {
       if (phase !== 'run') return;
       if (key === 'del') { typed = typed.slice(0, -1); drawEq(); return; }
-      if (key !== 'ok') { if (typed.length < 3) { typed += key; drawEq(); } return; }
+      if (key !== 'ok') {
+        if (typed.length < 3) {
+          typed += key; drawEq();
+          if (parseInt(typed, 10) === q.answer) onKey('ok');
+        }
+        return;
+      }
       if (!typed) return;
       if (parseInt(typed, 10) === q.answer) {
         count++;
