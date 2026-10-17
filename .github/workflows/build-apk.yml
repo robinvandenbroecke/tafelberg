@@ -1,0 +1,68 @@
+name: APK bouwen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Signeersleutel klaarzetten
+        env:
+          KEYSTORE_B64: ${{ secrets.TAFELBERG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tafelberg.jks"
+            echo "TAFELBERG_KEYSTORE=$RUNNER_TEMP/tafelberg.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Geen vaste signeersleutel gevonden. Deze APK is met een tijdelijke sleutel ondertekend; een volgende versie installeren vraagt dan eerst een verwijdering."
+          fi
+
+      - name: APK bouwen
+        env:
+          TAFELBERG_KEYSTORE_PASSWORD: ${{ secrets.TAFELBERG_KEYSTORE_PASSWORD }}
+          TAFELBERG_KEY_ALIAS: ${{ secrets.TAFELBERG_KEY_ALIAS }}
+          TAFELBERG_KEY_PASSWORD: ${{ secrets.TAFELBERG_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease \
+            -PversionCode=${{ github.run_number }} \
+            -PversionName=1.0.${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk Tafelberg.apk
+
+      - name: APK als artefact bewaren
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tafelberg-1.0.${{ github.run_number }}
+          path: Tafelberg.apk
+          if-no-files-found: error
+
+      - name: Release met APK publiceren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v1.0.${{ github.run_number }}"
+          gh release create "$tag" Tafelberg.apk \
+            --title "Tafelberg 1.0.${{ github.run_number }}" \
+            --notes "Gebouwd uit commit ${GITHUB_SHA::7}. Download Tafelberg.apk op de tablet en open het bestand om te installeren." \
+            --latest
