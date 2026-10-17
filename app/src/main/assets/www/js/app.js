@@ -12,6 +12,12 @@
  *     omhoog, maar enkel wanneer de som "aan de beurt" is (gespreide herhaling over dagen).
  *     Fouten zakken, krijgen meteen uitleg en komen in dezelfde ronde nog eens terug.
  *  Nieuwe sommen komen in kleine porties binnen, gemengd met sommen die al goed gaan.
+ *
+ * Spelelementen belonen inzet en nauwkeurigheid, niet alleen snelheid: sterren per juist
+ * antwoord, een bonusster per reeks van vijf, klimniveaus, dagen op rij en medailles.
+ * De sprint met klok is een vrijwillige uitdaging en gebruikt enkel sommen die al goed gaan.
+ *
+ * Meerdere spelers kunnen op hetzelfde toestel spelen, elk met een eigen voortgang.
  */
 (function () {
   'use strict';
@@ -28,6 +34,34 @@
   var PRAISE = ['Juist!', 'Knap!', 'Goed zo!', 'Straf!', 'Super!', 'Prima!'];
   var TIMES = '×';
   var SVGNS = 'http://www.w3.org/2000/svg';
+  var COLORS = ['#D33F49', '#E07B24', '#F2B705', '#2D7A4D', '#1F8A8A', '#2F6FD0', '#7A4FB5', '#4C5D82'];
+  var SPRINT_MS = 60000;
+  var SPRINT_MIN = 6;
+
+  // Klimniveaus: hoeveel sterren je nodig hebt voor elke titel.
+  var LEVELS = [
+    [0, 'Wandelaar'], [15, 'Padzoeker'], [40, 'Rotsklimmer'], [80, 'Touwklimmer'], [140, 'Gletsjerloper'],
+    [220, 'Berggids'], [320, 'Toppenjager'], [450, 'Bergkampioen'], [620, 'Sneeuwarend'], [850, 'Tafelkoning']
+  ];
+
+  // Medailles. Elke test krijgt de statistieken van de speler.
+  var BADGES = [
+    { id: 'step', icon: 'mountain', title: 'Eerste stap', text: 'Je eerste oefenronde.', test: function (st) { return st.rounds >= 1; } },
+    { id: 'perfect', icon: 'star', title: 'Foutloos', text: 'Een hele ronde zonder één fout.', test: function (st) { return st.perfect >= 1; } },
+    { id: 'combo10', icon: 'link', title: 'Lange reeks', text: '10 sommen na elkaar juist.', test: function (st) { return st.bestCombo >= 10; } },
+    { id: 'bolt8', icon: 'bolt', title: 'Bliksem', text: '8 keer bliksemsnel in één ronde.', test: function (st) { return st.bestBolts >= 8; } },
+    { id: 'help', icon: 'bulb', title: 'Slim gevraagd', text: 'Hulp gevraagd en dan juist.', test: function (st) { return st.helpOk >= 1; } },
+    { id: 'ladder', icon: 'stairs', title: 'Trappenloper', text: 'Een tafelrij naar boven en terug naar beneden.', test: function (st) { return ladderBoth(st) >= 1; } },
+    { id: 'summit1', icon: 'flag', title: 'Eerste top', text: 'Alle sommen van één tafel zitten erin.', test: function () { return summitsCount() >= 1; } },
+    { id: 'summit5', icon: 'flag', title: 'Vijf toppen', text: 'Vijf tafels helemaal onder de knie.', test: function () { return summitsCount() >= 5; } },
+    { id: 'summit10', icon: 'crown', title: 'Alle toppen', text: 'Alle tien tafels zitten erin.', test: function () { return summitsCount() >= 10; } },
+    { id: 'days3', icon: 'sun', title: 'Drie dagen', text: 'Drie dagen na elkaar geoefend.', test: function (st) { return st.bestStreak >= 3; } },
+    { id: 'days7', icon: 'sun', title: 'Een hele week', text: 'Zeven dagen na elkaar geoefend.', test: function (st) { return st.bestStreak >= 7; } },
+    { id: 'sprint10', icon: 'hut', title: 'Snelle voeten', text: '10 sommen in één sprint.', test: function (st) { return st.sprintBest >= 10; } },
+    { id: 'sprint20', icon: 'hut', title: 'Hutkampioen', text: '20 sommen in één sprint.', test: function (st) { return st.sprintBest >= 20; } },
+    { id: 'divide', icon: 'divide', title: 'Verdeler', text: '10 deelsommen juist.', test: function (st) { return st.divOk >= 10; } },
+    { id: 'stars200', icon: 'star', title: 'Sterrenhemel', text: '200 sterren verzameld.', test: function (st) { return st.stars >= 200; } }
+  ];
 
   var root = document.getElementById('app');
   var S = null;
@@ -37,30 +71,74 @@
   var deviceEink = /[?&]eink=1/.test(window.location.search);
 
   // ---------------------------------------------------------------- opslag
-  function defaultState() {
+  // Eén opslag voor het toestel, met daarin een profiel per speler.
+  function defaultStats() {
     return {
-      v: 1,
-      settings: { name: 'Hector', tables: [2, 5, 10], len: 12, div: false, eink: null, sound: true },
-      facts: {},
-      stats: { stars: 0, rounds: 0, days: 0, lastDay: '' }
+      stars: 0, rounds: 0, days: 0, lastDay: '', streak: 0, bestStreak: 0,
+      bestCombo: 0, bestBolts: 0, perfect: 0, helpOk: 0, divOk: 0,
+      sprints: 0, sprintBest: 0, ladderUp: {}, ladderDown: {}, badges: {}
     };
+  }
+
+  function defaultSettings() { return { tables: [2, 5, 10], len: 12, div: false, sound: true }; }
+
+  function defaultStore() { return { v: 2, device: { eink: null }, current: null, order: [], profiles: {} }; }
+
+  function makeProfile(name, color, tables) {
+    var id = 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    var st = defaultSettings();
+    if (tables && tables.length) st.tables = tables.slice();
+    return { id: id, name: name, color: color || 0, created: Date.now(), settings: st, facts: {}, stats: defaultStats() };
+  }
+
+  function fill(obj, defaults) {
+    for (var k in defaults) if (defaults.hasOwnProperty(k) && !(k in obj)) obj[k] = defaults[k];
+    return obj;
+  }
+
+  function migrate(st) {
+    if (!st || typeof st !== 'object') return defaultStore();
+    if (st.v === 2 && st.profiles) return st;
+    var out = defaultStore();
+    if (st.settings) {
+      // Opslag van de eerste versie: één speler zonder profielen.
+      var p = makeProfile(st.settings.name || 'Speler', 0, st.settings.tables);
+      p.settings.len = st.settings.len || 12;
+      p.settings.div = !!st.settings.div;
+      p.settings.sound = st.settings.sound !== false;
+      p.facts = st.facts || {};
+      if (st.stats) { p.stats.stars = st.stats.stars || 0; p.stats.rounds = st.stats.rounds || 0; p.stats.days = st.stats.days || 0; p.stats.lastDay = st.stats.lastDay || ''; }
+      out.device.eink = st.settings.eink === undefined ? null : st.settings.eink;
+      out.profiles[p.id] = p;
+      out.order.push(p.id);
+      out.current = p.id;
+    }
+    return out;
+  }
+
+  function normalise(st) {
+    st = migrate(st);
+    if (!st.device) st.device = { eink: null };
+    if (!st.order) st.order = [];
+    if (!st.profiles) st.profiles = {};
+    var keep = [];
+    for (var i = 0; i < st.order.length; i++) {
+      var p = st.profiles[st.order[i]];
+      if (!p) continue;
+      p.settings = fill(p.settings || {}, defaultSettings());
+      if (!p.settings.tables || !p.settings.tables.length) p.settings.tables = [2];
+      p.facts = p.facts || {};
+      p.stats = fill(p.stats || {}, defaultStats());
+      keep.push(p.id);
+    }
+    st.order = keep;
+    if (!st.current || !st.profiles[st.current]) st.current = keep.length ? keep[0] : null;
+    return st;
   }
 
   function bridge() {
     var b = window.AndroidStore;
     return b && typeof b.get === 'function' ? b : null;
-  }
-
-  function normalise(st) {
-    var d = defaultState(), k;
-    if (!st || typeof st !== 'object') return d;
-    if (!st.settings || typeof st.settings !== 'object') st.settings = {};
-    for (k in d.settings) if (d.settings.hasOwnProperty(k) && !(k in st.settings)) st.settings[k] = d.settings[k];
-    if (!st.facts || typeof st.facts !== 'object') st.facts = {};
-    if (!st.stats || typeof st.stats !== 'object') st.stats = {};
-    for (k in d.stats) if (d.stats.hasOwnProperty(k) && !(k in st.stats)) st.stats[k] = d.stats[k];
-    if (!st.settings.tables || !st.settings.tables.length) st.settings.tables = [2];
-    return st;
   }
 
   function loadState() {
@@ -76,6 +154,9 @@
     try { if (b) b.set(raw); } catch (e) { /* niets */ }
     try { window.localStorage.setItem(STORE_KEY, raw); } catch (e2) { /* niets */ }
   }
+
+  // De speler die nu aan de beurt is.
+  function P() { return S.profiles[S.current]; }
 
   // ---------------------------------------------------------------- DOM-hulp
   function add(e, kids) {
@@ -130,14 +211,6 @@
     return out.join(' ');
   }
 
-  function shuffle(a) {
-    for (var i = a.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1)), t = a[i];
-      a[i] = a[j]; a[j] = t;
-    }
-    return a;
-  }
-
   function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 
   function listNl(nums) {
@@ -145,13 +218,8 @@
     return nums.slice(0, -1).join(', ') + ' en ' + nums[nums.length - 1];
   }
 
-  function todayStr() {
-    var d = new Date();
-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-  }
-
   // ---------------------------------------------------------------- thema en maat
-  function einkOn() { return S.settings.eink === null ? deviceEink : !!S.settings.eink; }
+  function einkOn() { return S.device.eink === null ? deviceEink : !!S.device.eink; }
 
   function setHtmlClass(name, on) {
     var cl = document.documentElement.classList;
@@ -174,14 +242,15 @@
     setHtmlClass('land', w > hh);
     setHtmlClass('port', w <= hh);
     var port = w <= hh;
-    if (lastPort !== null && port !== lastPort && current && current.name === 'home') go('home');
+    if (lastPort !== null && port !== lastPort && current && (current.name === 'home' || current.name === 'table')) go(current.name, current.params);
     lastPort = port;
   }
 
   // ---------------------------------------------------------------- geluid
   var audioCtx = null;
   function play(notes, step) {
-    if (!S.settings.sound) return;
+    var pr = S && S.current ? P() : null;
+    if (!pr || !pr.settings.sound) return;
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -202,13 +271,16 @@
   var SND = {
     ok: function () { play([659, 880], 0.09); },
     fast: function () { play([659, 880, 1175], 0.08); },
+    combo: function () { play([784, 988, 1175, 1568], 0.07); },
     oops: function () { play([392, 349], 0.14); },
-    done: function () { play([523, 659, 784, 1047], 0.12); }
+    done: function () { play([523, 659, 784, 1047], 0.12); },
+    tick: function () { play([1047], 0.04); }
   };
 
   // ---------------------------------------------------------------- iconen
   function icon(name) {
     var svg = s('svg', { viewBox: '0 0 24 24', class: 'icon icon-' + name, 'aria-hidden': 'true' });
+    var i;
     if (name === 'star') {
       svg.appendChild(s('path', { d: 'M12 2.6l2.85 5.95 6.55.8-4.83 4.5 1.25 6.5L12 17.15 6.18 20.35l1.25-6.5L2.6 9.35l6.55-.8z', class: 'fill' }));
     } else if (name === 'bolt') {
@@ -219,7 +291,7 @@
       svg.appendChild(s('path', { d: 'M6 6l12 12M18 6L6 18', class: 'line' }));
     } else if (name === 'gear') {
       var g = s('g', { class: 'fill' });
-      for (var i = 0; i < 8; i++) g.appendChild(s('rect', { x: 10.4, y: 1.6, width: 3.2, height: 5, rx: 1, transform: 'rotate(' + (i * 45) + ' 12 12)' }));
+      for (i = 0; i < 8; i++) g.appendChild(s('rect', { x: 10.4, y: 1.6, width: 3.2, height: 5, rx: 1, transform: 'rotate(' + (i * 45) + ' 12 12)' }));
       svg.appendChild(g);
       svg.appendChild(s('circle', { cx: 12, cy: 12, r: 7, class: 'fill' }));
       svg.appendChild(s('circle', { cx: 12, cy: 12, r: 3, class: 'hole' }));
@@ -229,7 +301,7 @@
       }
     } else if (name === 'flag') {
       svg.appendChild(s('path', { d: 'M6 21V3.5', class: 'line' }));
-      svg.appendChild(s('path', { d: 'M6.5 4h11l-3 4 3 4h-11z', class: 'fill' }));
+      svg.appendChild(s('path', { d: 'M6.5 4h11l-3 4 3 4h-11z', class: 'fill flagcloth' }));
     } else if (name === 'stairs') {
       svg.appendChild(s('path', { d: 'M3 20h5v-5h5v-5h5V5h3', class: 'line' }));
     } else if (name === 'erase') {
@@ -237,6 +309,33 @@
       svg.appendChild(s('path', { d: 'M11 9.5l5 5M16 9.5l-5 5', class: 'line' }));
     } else if (name === 'mountain') {
       svg.appendChild(s('path', { d: 'M1.5 20.5L9 7l3.6 6.2L15.4 9l7.1 11.5z', class: 'fill' }));
+    } else if (name === 'sun') {
+      svg.appendChild(s('circle', { cx: 12, cy: 12, r: 4.6, class: 'fill' }));
+      for (i = 0; i < 8; i++) svg.appendChild(s('line', { x1: 12, y1: 2.6, x2: 12, y2: 5.2, class: 'line thin', transform: 'rotate(' + (i * 45) + ' 12 12)' }));
+    } else if (name === 'crown') {
+      svg.appendChild(s('path', { d: 'M3 18.5h18L19.6 7.5l-4.6 4.3L12 5l-3 6.8-4.6-4.3z', class: 'fill' }));
+    } else if (name === 'bulb') {
+      svg.appendChild(s('path', { d: 'M12 2.8a6.2 6.2 0 0 0-3.7 11.2V16.5h7.4V14A6.2 6.2 0 0 0 12 2.8z', class: 'fill' }));
+      svg.appendChild(s('path', { d: 'M9 19h6M10 21.4h4', class: 'line thin' }));
+    } else if (name === 'link') {
+      svg.appendChild(s('rect', { x: 2.5, y: 8, width: 11, height: 8, rx: 4, class: 'line' }));
+      svg.appendChild(s('rect', { x: 10.5, y: 8, width: 11, height: 8, rx: 4, class: 'line' }));
+    } else if (name === 'hut') {
+      svg.appendChild(s('path', { d: 'M2.5 12.2L12 4l9.5 8.2', class: 'line' }));
+      svg.appendChild(s('path', { d: 'M5.2 10.4V20.5h13.6V10.4L12 4.6z', class: 'fill' }));
+      svg.appendChild(s('rect', { x: 10, y: 14.5, width: 4, height: 6, class: 'hole' }));
+    } else if (name === 'divide') {
+      svg.appendChild(s('circle', { cx: 12, cy: 5.5, r: 2.2, class: 'fill' }));
+      svg.appendChild(s('circle', { cx: 12, cy: 18.5, r: 2.2, class: 'fill' }));
+      svg.appendChild(s('path', { d: 'M4 12h16', class: 'line' }));
+    } else if (name === 'medal') {
+      svg.appendChild(s('path', { d: 'M7 2.5h4l2 6h-4zM17 2.5h-4l-2 6h4z', class: 'fill soft' }));
+      svg.appendChild(s('circle', { cx: 12, cy: 15, r: 6.5, class: 'fill' }));
+      svg.appendChild(s('circle', { cx: 12, cy: 15, r: 3, class: 'hole' }));
+    } else if (name === 'plus') {
+      svg.appendChild(s('path', { d: 'M12 5v14M5 12h14', class: 'line' }));
+    } else if (name === 'swap') {
+      svg.appendChild(s('path', { d: 'M4 8h13l-3.5-3.5M20 16H7l3.5 3.5', class: 'line' }));
     }
     return svg;
   }
@@ -249,9 +348,149 @@
     return h('button', { class: 'icon-btn' + (extra ? ' ' + extra : ''), 'aria-label': label, title: label, onclick: fn }, icon(name));
   }
 
+  function initial(name) { return (name || '?').charAt(0).toUpperCase(); }
+
+  function avatar(pr, extra) {
+    var ci = pr.color % COLORS.length;
+    return h('span', {
+      class: 'avatar' + (extra ? ' ' + extra : ''),
+      style: 'background-color:' + COLORS[ci] + ';color:' + (ci === 2 ? '#1F2A44' : '#FFFFFF'),
+      'aria-hidden': 'true'
+    }, initial(pr.name));
+  }
+
+  // ---------------------------------------------------------------- klimniveaus
+  function levelInfo(stars) {
+    var i = 0;
+    while (i + 1 < LEVELS.length && stars >= LEVELS[i + 1][0]) i++;
+    var from = LEVELS[i][0], last = i + 1 >= LEVELS.length;
+    var to = last ? from : LEVELS[i + 1][0];
+    return {
+      n: i + 1, title: LEVELS[i][1], next: last ? null : LEVELS[i + 1][1],
+      need: last ? 0 : to - stars, frac: last ? 1 : (stars - from) / (to - from)
+    };
+  }
+
+  function levelCard(stars, extra) {
+    var L = levelInfo(stars);
+    return h('div', { class: 'lvl' + (extra ? ' ' + extra : '') }, [
+      h('span', { class: 'lvl-n', 'aria-label': 'niveau ' + L.n }, String(L.n)),
+      h('div', { class: 'lvl-body' }, [
+        h('span', { class: 'lvl-title' }, L.title),
+        h('div', { class: 'lvl-bar' }, h('div', { class: 'lvl-fill', style: 'width:' + Math.round(L.frac * 100) + '%' })),
+        h('span', { class: 'lvl-need' }, L.next ? 'Nog ' + L.need + (L.need === 1 ? ' ster' : ' sterren') + ' tot ' + L.next : 'Het hoogste niveau!')
+      ])
+    ]);
+  }
+
+  // ---------------------------------------------------------------- dagen op rij, sterren, medailles
+  function dayStr(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function todayStr() { return dayStr(new Date()); }
+  function yesterdayStr() { var d = new Date(); d.setDate(d.getDate() - 1); return dayStr(d); }
+
+  function markDay() {
+    var st = P().stats, today = todayStr();
+    if (st.lastDay === today) return;
+    st.streak = st.lastDay === yesterdayStr() ? st.streak + 1 : 1;
+    if (st.streak > st.bestStreak) st.bestStreak = st.streak;
+    st.days++;
+    st.lastDay = today;
+  }
+
+  function currentStreak() {
+    var st = P().stats;
+    return (st.lastDay === todayStr() || st.lastDay === yesterdayStr()) ? st.streak : 0;
+  }
+
+  function addStars(n) { P().stats.stars += n; }
+
+  function ladderBoth(st) {
+    var n = 0;
+    for (var t in st.ladderUp) if (st.ladderUp.hasOwnProperty(t) && st.ladderDown[t]) n++;
+    return n;
+  }
+
+  function summitsCount() {
+    var n = 0;
+    for (var t = 1; t <= 10; t++) if (tableDone(t)) n++;
+    return n;
+  }
+
+  // Kent nieuwe medailles toe en geeft ze terug.
+  function awardBadges() {
+    var st = P().stats, got = [];
+    for (var i = 0; i < BADGES.length; i++) {
+      var b = BADGES[i];
+      if (!st.badges[b.id] && b.test(st)) { st.badges[b.id] = todayStr(); got.push(b); }
+    }
+    return got;
+  }
+
+  function badgeCount() {
+    var n = 0, st = P().stats;
+    for (var i = 0; i < BADGES.length; i++) if (st.badges[BADGES[i].id]) n++;
+    return n;
+  }
+
+  function medal(b, earned, extra) {
+    var svg = s('svg', { viewBox: '0 0 48 56', class: 'medal' + (earned ? ' won' : ' locked') + (extra ? ' ' + extra : ''), 'aria-hidden': 'true' });
+    svg.appendChild(s('path', { d: 'M13 2h9l5 16h-9z', class: 'ribbon-a' }));
+    svg.appendChild(s('path', { d: 'M35 2h-9l-5 16h9z', class: 'ribbon-b' }));
+    svg.appendChild(s('circle', { cx: 24, cy: 34, r: 19, class: 'disc' }));
+    svg.appendChild(s('circle', { cx: 24, cy: 34, r: 14.5, class: 'disc-in' }));
+    var ic = icon(b.icon);
+    ic.setAttribute('class', 'micon icon-' + b.icon);
+    ic.setAttribute('x', '14'); ic.setAttribute('y', '24'); ic.setAttribute('width', '20'); ic.setAttribute('height', '20');
+    svg.appendChild(ic);
+    return svg;
+  }
+
+  function newBadgesBlock(list) {
+    if (!list.length) return null;
+    var row = h('div', { class: 'new-badges' });
+    for (var i = 0; i < list.length; i++) {
+      row.appendChild(h('div', { class: 'new-badge' }, [medal(list[i], true), h('span', { class: 'nb-title' }, list[i].title)]));
+    }
+    return h('div', { class: 'sum-block' }, [h('h2', null, list.length === 1 ? 'Nieuwe medaille' : 'Nieuwe medailles'), row]);
+  }
+
+  // Een korte regen van papiersnippers, alleen in kleur en zonder 'minder beweging'.
+  function confetti(host) {
+    if (einkOn()) return;
+    try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* niets */ }
+    var box = h('div', { class: 'confetti', 'aria-hidden': 'true' });
+    var cols = ['#F2B705', '#D33F49', '#2F6FD0', '#2D7A4D', '#FFFFFF', '#E07B24'];
+    for (var i = 0; i < 36; i++) {
+      var left = Math.random() * 100, delay = Math.random() * 0.8, dur = 2.2 + Math.random() * 1.4, rot = Math.floor(Math.random() * 360);
+      var st = 'left:' + left.toFixed(1) + '%;background-color:' + cols[i % cols.length] + ';-webkit-animation-delay:' + delay.toFixed(2) + 's;animation-delay:' + delay.toFixed(2) +
+        's;-webkit-animation-duration:' + dur.toFixed(2) + 's;animation-duration:' + dur.toFixed(2) + 's;-webkit-transform:rotate(' + rot + 'deg);transform:rotate(' + rot + 'deg)';
+      box.appendChild(h('span', { class: 'bit' + (i % 3 === 0 ? ' round' : ''), style: st }));
+    }
+    host.appendChild(box);
+    later(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 4500);
+  }
+
+  // Kleine klimhelling voor in de balk tijdens een ronde: elke som is een stap naar de top.
+  function climbBar(len, done, onStep) {
+    var W = 320, H = 46, x0 = 14, y0 = 38, x1 = 292, y1 = 12;
+    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'climb', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' });
+    svg.appendChild(s('polygon', { points: pts([[0, H], [0, y0 + 3], [x0, y0], [x1, y1], [W, y1 + 8], [W, H]]), class: 'climb-hill' }));
+    svg.appendChild(s('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'climb-line' }));
+    for (var i = 0; i <= len; i++) {
+      var f = i / len, x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f;
+      if (i === len) continue;
+      svg.appendChild(s('circle', { cx: x, cy: y, r: 3.3, class: 'climb-stop' + (i < done ? ' on' : '') + (i === onStep ? ' now' : '') }));
+    }
+    svg.appendChild(s('line', { x1: x1, y1: y1, x2: x1, y2: y1 - 12, class: 'climb-pole' }));
+    svg.appendChild(s('polygon', { points: pts([[x1 + 0.5, y1 - 12], [x1 + 10, y1 - 9], [x1 + 0.5, y1 - 6]]), class: 'pennant' }));
+    var cf = Math.min(done, len) / len;
+    svg.appendChild(s('circle', { cx: x0 + (x1 - x0) * cf, cy: y0 + (y1 - y0) * cf - 6.5, r: 5.2, class: 'climber' }));
+    return svg;
+  }
+
   // ---------------------------------------------------------------- sommen en niveaus
   function fkey(a, t) { return a + 'x' + t; }
-  function getFact(a, t) { return S.facts[fkey(a, t)] || null; }
+  function getFact(a, t) { return P().facts[fkey(a, t)] || null; }
   function box(a, t) { var f = getFact(a, t); return f ? f.b : -1; }
 
   // 0 = nog niet geoefend, 1 = aan het leren, 2 = bijna, 3 = zit erin
@@ -510,7 +749,7 @@
   }
 
   // Eén tekening voor een rij bergen: verre rug, dan de bergen van links naar rechts, dan de weide.
-  function rangeSvg(tables, port) {
+  function rangeSvg(tables, port, decor) {
     var n = tables.length, g0 = peakGeom(1, port), W = n * 100, i;
     var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + g0.vbH, class: 'range-svg', preserveAspectRatio: 'xMidYMax meet', 'aria-hidden': 'true' });
     var far = [[0, g0.base + 2], [0, g0.base - 0.34 * g0.maxH]];
@@ -524,13 +763,13 @@
 
     for (i = 0; i < n; i++) {
       var t = tables[i], g = peakGeom(t, port), base = g.base, H = g.H;
-      var prog = tableProgress(t), done = tableDone(t);
+      var prog = decor ? 0 : tableProgress(t), done = decor ? false : tableDone(t);
       var ridge = ridgeFor(g), trail = trailFor(g);
       var grp = s('g', { transform: 'translate(' + (i * 100) + ' 0)' });
       grp.appendChild(s('polygon', { points: pts(ridge), class: 'mtn mtn' + (t % 3) }));
       var cap = snowCap(ridge, base - 0.72 * H);
       if (cap.length) grp.appendChild(s('polygon', { points: pts(cap), class: 'snow' }));
-      grp.appendChild(s('polyline', { points: pts(trail), class: 'trail' }));
+      if (!decor) grp.appendChild(s('polyline', { points: pts(trail), class: 'trail' }));
       if (prog > 0) grp.appendChild(s('polyline', { points: pts(partialPath(trail, prog)), class: 'trail-done' }));
       if (done) {
         var top = base - H;
@@ -542,7 +781,7 @@
 
     svg.appendChild(s('rect', { x: 0, y: g0.base, width: W, height: g0.vbH - g0.base + 2, class: 'meadow' }));
     svg.appendChild(s('line', { x1: 0, y1: g0.base, x2: W, y2: g0.base, class: 'ground' }));
-    for (i = 0; i < n; i++) {
+    for (i = 0; i < n && !decor; i++) {
       var tt = tables[i], gg = peakGeom(tt, port), cx = i * 100 + 50;
       if (!tableDone(tt)) {
         var tr = trailFor(gg), at = partialPath(tr, tableProgress(tt));
@@ -565,39 +804,181 @@
     return h('div', { class: 'range-row' }, [rangeSvg(tables, port), hits]);
   }
 
+  // ---------- gedeelde keuzelijsten
+  function tableChooser(list, onChange) {
+    var wrap = h('div', { class: 'table-chips' });
+    function draw() {
+      wrap.innerHTML = '';
+      for (var t = 1; t <= 10; t++) {
+        (function (tt) {
+          var on = list.indexOf(tt) >= 0;
+          wrap.appendChild(h('button', {
+            class: 'tchip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'aria-label': 'Tafel van ' + tt,
+            onclick: function () {
+              var idx = list.indexOf(tt);
+              if (idx >= 0) { if (list.length > 1) list.splice(idx, 1); }
+              else { list.push(tt); list.sort(function (x, y) { return x - y; }); }
+              if (onChange) onChange();
+              draw();
+            }
+          }, String(tt)));
+        })(t);
+      }
+    }
+    draw();
+    return wrap;
+  }
+
+  function colorChooser(get, set) {
+    var wrap = h('div', { class: 'swatches' });
+    function draw() {
+      wrap.innerHTML = '';
+      for (var i = 0; i < COLORS.length; i++) {
+        (function (ci) {
+          wrap.appendChild(h('button', {
+            class: 'swatch' + (get() === ci ? ' on' : ''), style: 'background-color:' + COLORS[ci],
+            'aria-label': 'Kleur ' + (ci + 1), 'aria-pressed': get() === ci ? 'true' : 'false',
+            onclick: function () { set(ci); draw(); }
+          }));
+        })(i);
+      }
+    }
+    draw();
+    return wrap;
+  }
+
+  // ---------- startscherm
   screens.home = function () {
     current.back = null;
-    var st = S.settings;
+    var pr = P(), st = pr.settings, stats = pr.stats;
     var port = isPort();
     var peaks = h('div', { class: 'peaks' }, port
       ? [rangeRow([1, 2, 3, 4, 5], true), rangeRow([6, 7, 8, 9, 10], true)]
       : rangeRow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], false));
     var sun = s('svg', { viewBox: '0 0 40 40', class: 'sun', 'aria-hidden': 'true' }, s('circle', { cx: 20, cy: 20, r: 14 }));
     var label = st.tables.length === 1 ? 'de tafel van ' + st.tables[0] : 'tafels van ' + listNl(st.tables);
+    var streak = currentStreak();
+
+    var right = [];
+    if (streak > 0) {
+      right.push(h('div', { class: 'chip-days', 'aria-label': streak === 1 ? '1 dag geoefend' : streak + ' dagen op rij' }, [icon('sun'), h('span', null, String(streak))]));
+    }
+    right.push(starBadge(stats.stars));
+    right.push(iconButton('gear', 'Instellingen', function () { go('settings'); }));
 
     root.appendChild(h('div', { class: 'screen home' }, [
       h('header', { class: 'bar home-bar' }, [
-        h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]),
-        h('div', { class: 'bar-side bar-right' }, [starBadge(S.stats.stars), iconButton('gear', 'Instellingen', function () { go('settings'); })])
+        h('button', { class: 'player-chip', 'aria-label': 'Andere speler kiezen', onclick: function () { go('who'); } }, [
+          avatar(pr), h('span', { class: 'player-name' }, pr.name), icon('swap')
+        ]),
+        h('div', { class: 'bar-side bar-right' }, right)
       ]),
       h('div', { class: 'range' }, [
         sun,
         h('div', { class: 'hello' }, [
-          h('h1', null, st.name ? 'Dag ' + st.name + '!' : 'Dag!'),
-          h('p', null, 'Tik op een berg om een tafel te bekijken.')
+          h('h1', null, 'Dag ' + pr.name + '!'),
+          levelCard(stats.stars, 'home-lvl'),
+          h('p', { class: 'hello-hint' }, 'Tik op een berg om een tafel te bekijken.')
         ]),
         peaks
       ]),
       h('div', { class: 'home-actions' }, [
-        h('button', { class: 'btn btn-sun btn-big', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
+        h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
           h('span', { class: 'btn-title' }, 'Oefenen'),
           h('span', { class: 'btn-sub' }, label)
         ]),
-        h('button', { class: 'btn btn-ice btn-big', onclick: function () { go('chart'); } }, [
-          icon('grid'),
-          h('span', { class: 'btn-title' }, 'Mijn tafelkaart')
-        ])
+        h('button', { class: 'btn btn-ice btn-big btn-tile', onclick: function () { go('sprint'); } }, [icon('hut'), h('span', { class: 'btn-title' }, 'Sprint')]),
+        h('button', { class: 'btn btn-ice btn-big btn-tile', onclick: function () { go('medals'); } }, [icon('medal'), h('span', { class: 'btn-title' }, 'Medailles')]),
+        h('button', { class: 'btn btn-ice btn-big btn-tile', onclick: function () { go('chart'); } }, [icon('grid'), h('span', { class: 'btn-title' }, 'Tafelkaart')])
       ])
+    ]));
+  };
+
+  function decoRange() {
+    var port = isPort();
+    return h('div', { class: 'deco', 'aria-hidden': 'true' }, rangeSvg(port ? [3, 7, 1, 9, 5] : [1, 3, 6, 2, 9, 7, 4, 8, 10, 5], port, true));
+  }
+
+  // ---------- wie speelt er?
+  screens.who = function () {
+    current.back = S.current ? function () { go('home'); } : null;
+    var cards = h('div', { class: 'who-cards' });
+    for (var i = 0; i < S.order.length; i++) {
+      (function (id) {
+        var pr = S.profiles[id], L = levelInfo(pr.stats.stars);
+        cards.appendChild(h('button', {
+          class: 'who-card' + (id === S.current ? ' cur' : ''), 'aria-label': pr.name,
+          onclick: function () { S.current = id; saveState(); go('home'); }
+        }, [
+          avatar(pr, 'big'),
+          h('span', { class: 'who-name' }, pr.name),
+          h('span', { class: 'who-lvl' }, L.title),
+          h('span', { class: 'who-stars' }, [icon('star'), String(pr.stats.stars)])
+        ]));
+      })(S.order[i]);
+    }
+    cards.appendChild(h('button', { class: 'who-card who-new', onclick: function () { go('newPlayer'); } }, [
+      h('span', { class: 'avatar big avatar-new' }, icon('plus')),
+      h('span', { class: 'who-name' }, 'Nieuwe klimmer')
+    ]));
+
+    root.appendChild(h('div', { class: 'screen who' }, [
+      topBar(current.back ? iconButton('back', 'Terug', current.back) : null,
+        h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), null),
+      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cards]),
+      decoRange()
+    ]));
+  };
+
+  // ---------- nieuwe speler
+  screens.newPlayer = function () {
+    var first = !S.order.length;
+    var name = '', color = S.order.length % COLORS.length, tables = [2, 5, 10];
+    current.back = first ? null : function () { go('who'); };
+
+    var preview = h('div', { class: 'np-preview' });
+    var input = h('input', { type: 'text', class: 'name-input big', maxlength: '20', autocomplete: 'off', placeholder: 'Naam', 'aria-label': 'Naam' });
+    var startBtn = h('button', { class: 'btn btn-sun np-start', onclick: create }, h('span', { class: 'btn-title' }, 'Start de klim'));
+
+    function drawPreview() {
+      preview.innerHTML = '';
+      add(preview, avatar({ name: name || '?', color: color }, 'big'));
+      startBtn.className = 'btn btn-sun np-start' + (name ? '' : ' off');
+    }
+
+    function create() {
+      if (!name) { input.focus(); return; }
+      var pr = makeProfile(name, color, tables);
+      S.profiles[pr.id] = pr;
+      S.order.push(pr.id);
+      S.current = pr.id;
+      saveState();
+      go('home');
+    }
+
+    input.addEventListener('input', function () { name = input.value.replace(/^\s+|\s+$/g, ''); drawPreview(); }, false);
+    input.addEventListener('keydown', function (e) { if ((e.keyCode || e.which) === 13) { input.blur(); create(); } }, false);
+    drawPreview();
+
+    root.appendChild(h('div', { class: 'screen newplayer' }, [
+      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), null),
+      h('div', { class: 'np-main' }, [
+        h('div', { class: 'np-card' }, [
+          first ? h('p', { class: 'np-intro' }, 'Elke tafel is een berg. Wie de sommen vlot kent, klimt naar de top.') : null,
+          h('div', { class: 'np-row' }, [
+            preview,
+            h('div', { class: 'np-field grow' }, [h('span', { class: 'set-label' }, 'Hoe heet de klimmer?'), input])
+          ]),
+          h('div', { class: 'np-field' }, [h('span', { class: 'set-label' }, 'Kies een kleur'), colorChooser(function () { return color; }, function (c) { color = c; drawPreview(); })]),
+          h('div', { class: 'np-field' }, [
+            h('span', { class: 'set-label' }, 'Met welke tafels begin je?'),
+            h('span', { class: 'set-note' }, 'Kies de tafels die in de klas al aan bod kwamen. Dit kan later nog veranderen.'),
+            tableChooser(tables, null)
+          ]),
+          startBtn
+        ])
+      ]),
+      decoRange()
     ]));
   };
 
@@ -645,7 +1026,7 @@
     drawPanel();
 
     root.appendChild(h('div', { class: 'screen table' }, [
-      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'De tafel van ' + t), starBadge(S.stats.stars)),
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'De tafel van ' + t), starBadge(P().stats.stars)),
       h('p', { class: 'table-tip' }, tableTip(t)),
       h('div', { class: 'table-main' }, [list, panel]),
       h('div', { class: 'table-actions' }, [
@@ -657,13 +1038,14 @@
 
   // ---------- tafelrij: de rij opzeggen als een trap naar de top
   screens.ladder = function (p) {
-    var t = p.t, dir = p.dir || 1;
+    var t = p.t, dir = p.dir || 1, pr = P();
     var vals = [];
     for (var i = 0; i <= 10; i++) vals.push(i * t);
     if (dir < 0) vals.reverse();
     var pos = 1, typed = '', misses = 0, firstTry = true, finished = false;
     current.back = function () { go('table', { t: t }); };
 
+    var stars = starBadge(pr.stats.stars);
     var svg = s('svg', { viewBox: '0 -95 620 515', class: 'ladder-svg', preserveAspectRatio: 'xMidYMid meet' });
     var display = h('div', { class: 'ladder-display' });
     var msg = h('p', { class: 'ladder-msg' });
@@ -700,7 +1082,7 @@
         svg.appendChild(s('circle', { cx: me[0] - 20, cy: me[1] - 26, r: 9, class: 'climber' }));
       }
       display.innerHTML = '';
-      add(display, typed || ' ');
+      add(display, typed || '\u00a0');
     }
 
     function step() { return dir > 0 ? '+' : '−'; }
@@ -712,6 +1094,11 @@
       if (eqLine) add(msg, h('span', { class: 'msg-eq' }, eqLine));
     }
 
+    function drawStars() {
+      var n = stars.getElementsByTagName('span');
+      for (var q = 0; q < n.length; q++) if (n[q].className === 'stars-n') n[q].textContent = String(pr.stats.stars);
+    }
+
     function onKey(key) {
       if (finished) return;
       if (key === 'del') { typed = typed.slice(0, -1); draw(); return; }
@@ -719,14 +1106,17 @@
         if (!typed) return;
         var want = vals[pos], prev = vals[pos - 1];
         if (parseInt(typed, 10) === want) {
-          if (firstTry) { S.stats.stars++; }
+          if (firstTry) { addStars(1); drawStars(); }
           SND.ok();
           pos++; typed = ''; misses = 0; firstTry = true;
           if (pos > 10) {
             finished = true;
+            if (dir > 0) pr.stats.ladderUp[t] = 1; else pr.stats.ladderDown[t] = 1;
+            markDay();
+            var got = awardBadges();
             saveState();
             SND.done();
-            showEnd();
+            showEnd(got);
           } else {
             setMsg(dir > 0 ? 'Juist! En de volgende steen?' : 'Juist! En de steen eronder?', null, false);
           }
@@ -744,7 +1134,7 @@
     }
 
     var side = h('div', { class: 'ladder-side' });
-    function showEnd() {
+    function showEnd(got) {
       side.innerHTML = '';
       var title = dir > 0 ? 'Je bent boven!' : 'Weer beneden!';
       add(side, [
@@ -752,12 +1142,14 @@
           icon('flag'),
           h('h2', null, title),
           h('p', null, dir > 0 ? 'Durf je nu achteruit naar beneden?' : 'Je kent de tafelrij van ' + t + ' in twee richtingen.'),
+          newBadgesBlock(got),
           dir > 0
             ? h('button', { class: 'btn btn-sun', onclick: function () { go('ladder', { t: t, dir: -1 }); } }, h('span', { class: 'btn-title' }, 'Achteruit naar beneden'))
             : h('button', { class: 'btn btn-sun', onclick: function () { go('practice', { tables: [t], from: 'table' }); } }, h('span', { class: 'btn-title' }, 'Oefen de tafel van ' + t)),
           h('button', { class: 'btn btn-ice', onclick: current.back }, h('span', { class: 'btn-title' }, 'Klaar'))
         ])
       ]);
+      if (got.length) confetti(root.firstChild);
     }
 
     setMsg(dir > 0 ? 'Je start onderaan bij 0. Welk getal komt op de volgende steen?' : 'Je start bovenaan bij ' + (10 * t) + '. Welk getal komt eronder?', null, false);
@@ -766,7 +1158,7 @@
     draw();
 
     root.appendChild(h('div', { class: 'screen ladder' }, [
-      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Tafelrij van ' + t), starBadge(S.stats.stars)),
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Tafelrij van ' + t), stars),
       h('div', { class: 'ladder-main' }, [h('div', { class: 'ladder-art' }, svg), side])
     ]));
   };
@@ -778,9 +1170,10 @@
     var before = {};
     for (var j = 0; j < tables.length; j++) before[tables[j]] = tableDone(tables[j]);
     return {
-      tables: tables.slice(), pool: pool, len: S.settings.len,
+      tables: tables.slice(), pool: pool, len: P().settings.len,
       i: 0, main: 0, queue: [], hist: [], count: {}, newBudget: 3,
-      stars: 0, firstOk: 0, fast: 0, wrong: [], wrongSeen: {}, mastered: [], doneBefore: before
+      stars: 0, firstOk: 0, fast: 0, wrong: [], wrongSeen: {}, mastered: [], doneBefore: before,
+      answered: 0, combo: 0, bestCombo: 0, bonus: 0, starsBefore: P().stats.stars, perfect: false, newBadges: []
     };
   }
 
@@ -823,7 +1216,7 @@
       var p = se.pool[j], k = fkey(p.a, p.t);
       if (askedWithin(se, k, win) || queued(se, k)) continue;
       if (!lastResort && (se.count[k] || 0) >= 3) continue;
-      var f = S.facts[k];
+      var f = P().facts[k];
       if (!f) fresh.push(p);
       else if (f.b < 2) learn.push(p);
       else if (now >= f.due) due.push(p);
@@ -842,7 +1235,7 @@
   function makeQuestion(a, t, reask) {
     var f = getFact(a, t), b = f ? f.b : -1, kind = 'mul';
     if (!reask && b >= 2) {
-      var r = Math.random(), div = S.settings.div;
+      var r = Math.random(), div = P().settings.div;
       if (div && b >= 3 && r < 0.25) kind = 'div';
       else if (b >= 3 && r < (div ? 0.4 : 0.2)) kind = 'miss';
       else if (a !== t && r < (div ? 0.6 : 0.45)) kind = 'swap';
@@ -888,8 +1281,8 @@
 
   // Het hart van de herhaling: hoe verandert het niveau van een som na een antwoord?
   function grade(q, ok, ms, assisted) {
-    var k = fkey(q.a, q.t), f = S.facts[k], now = Date.now(), isNew = !f;
-    if (!f) f = S.facts[k] = { b: 0, n: 0, c: 0, due: 0, last: 0 };
+    var k = fkey(q.a, q.t), f = P().facts[k], now = Date.now(), isNew = !f;
+    if (!f) f = P().facts[k] = { b: 0, n: 0, c: 0, due: 0, last: 0 };
     var before = isNew ? -1 : f.b;
     var fast = ok && !assisted && ms <= fastLimit(q);
     f.n++;
@@ -914,7 +1307,8 @@
   }
 
   screens.practice = function (p) {
-    var tables = p.tables && p.tables.length ? p.tables : S.settings.tables;
+    var pr = P();
+    var tables = p.tables && p.tables.length ? p.tables : pr.settings.tables;
     var se = newSession(tables);
     var q = null, typed = '', phase = 'ask', started = 0, assisted = false;
     current.back = function () {
@@ -922,23 +1316,28 @@
       else go('home');
     };
 
-    var pebbles = h('div', { class: 'pebbles', 'aria-hidden': 'true' });
-    var stars = starBadge(S.stats.stars);
+    var climbWrap = h('div', { class: 'climb-wrap' });
+    var combo = h('div', { class: 'combo', 'aria-live': 'polite' });
+    var stars = starBadge(pr.stats.stars);
     var eq = h('div', { class: 'equation', 'aria-live': 'polite' });
     var fb = h('div', { class: 'feedback' });
     var helpBtn = h('button', { class: 'btn btn-ghost help-btn', onclick: showHelp }, 'Hulp');
     var helpRow = h('div', { class: 'help-row' }, helpBtn);
 
-    function drawPebbles() {
-      pebbles.innerHTML = '';
-      for (var i = 0; i < se.len; i++) {
-        pebbles.appendChild(h('span', { class: 'pebble' + (i < se.main ? ' done' : '') + (i === se.main - 1 && !q.reask && phase !== 'ask' ? ' last' : '') + (i === se.main && phase === 'ask' && !q.reask ? ' now' : '') }));
-      }
+    function drawClimb() {
+      climbWrap.innerHTML = '';
+      add(climbWrap, climbBar(se.len, Math.min(se.answered, se.len), phase === 'ask' && !q.reask ? se.answered : -1));
+    }
+
+    function drawCombo() {
+      combo.innerHTML = '';
+      combo.className = 'combo' + (se.combo >= 2 ? ' on' : '');
+      if (se.combo >= 2) add(combo, [icon('link'), h('span', null, String(se.combo))]);
     }
 
     function drawStars() {
       var n = stars.getElementsByTagName('span');
-      for (var i = 0; i < n.length; i++) if (n[i].className === 'stars-n') n[i].textContent = String(S.stats.stars);
+      for (var i = 0; i < n.length; i++) if (n[i].className === 'stars-n') n[i].textContent = String(pr.stats.stars);
     }
 
     function drawEq(reveal) {
@@ -947,7 +1346,7 @@
         var part = q.parts[i];
         if (part === null) {
           var txt = reveal ? String(q.answer) : typed;
-          eq.appendChild(h('span', { class: 'tok blank' + (txt ? ' filled' : '') + (phase === 'fix' ? ' fix' : '') }, txt || ' '));
+          eq.appendChild(h('span', { class: 'tok blank' + (txt ? ' filled' : '') + (phase === 'fix' ? ' fix' : '') }, txt || '\u00a0'));
         } else if (part === TIMES || part === ':' || part === '=') {
           eq.appendChild(h('span', { class: 'tok op' }, part));
         } else {
@@ -985,14 +1384,19 @@
       typed = ''; phase = 'ask'; assisted = false;
       fb.innerHTML = ''; fb.className = 'feedback';
       helpRow.style.display = '';
-      drawEq(false); drawPebbles();
+      drawEq(false); drawClimb(); drawCombo();
       started = Date.now();
     }
 
     function finish() {
-      S.stats.rounds++;
-      var today = todayStr();
-      if (S.stats.lastDay !== today) { S.stats.days++; S.stats.lastDay = today; }
+      var st = pr.stats;
+      st.rounds++;
+      markDay();
+      se.perfect = !se.wrong.length && se.firstOk >= se.len;
+      if (se.perfect) st.perfect++;
+      if (se.bestCombo > st.bestCombo) st.bestCombo = se.bestCombo;
+      if (se.fast > st.bestBolts) st.bestBolts = se.fast;
+      se.newBadges = awardBadges();
       saveState();
       go('summary', { se: se, from: p.from });
     }
@@ -1029,32 +1433,47 @@
       var k = fkey(q.a, q.t);
       se.count[k] = (se.count[k] || 0) + 1;
       se.hist.push({ k: k, weak: !ok || assisted || (res.isNew && !res.fast) });
+      if (!q.reask) se.answered++;
 
       if (ok) {
         phase = 'wait';
-        if (!assisted) { S.stats.stars++; se.stars++; }
+        var bonus = false;
+        if (!assisted) {
+          se.combo++;
+          if (se.combo > se.bestCombo) se.bestCombo = se.combo;
+          addStars(1); se.stars++;
+          if (se.combo % 5 === 0) { addStars(1); se.stars++; se.bonus++; bonus = true; }
+        } else {
+          se.combo = 0;
+          pr.stats.helpOk++;
+        }
+        if (q.kind === 'div') pr.stats.divOk++;
         if (!q.reask && !assisted) se.firstOk++;
         if (res.fast && !q.reask) { se.fast++; if (res.isNew) se.newBudget++; }
-        if (res.before < MASTER && res.after >= MASTER) se.mastered.push(q);
+        var nowMastered = res.before < MASTER && res.after >= MASTER;
+        if (nowMastered) se.mastered.push(q);
         saveState();
-        drawStars();
+        drawStars(); drawCombo(); drawClimb();
         drawEq(false);
         fb.className = 'feedback good';
         fb.innerHTML = '';
         var line = [h('span', { class: 'fb-praise' }, pick(PRAISE))];
         if (res.fast) line.push(icon('bolt'));
         add(fb, h('p', { class: 'fb-big' }, line));
-        if (res.before < MASTER && res.after >= MASTER) add(fb, h('p', { class: 'fb-sub' }, 'Die zit erin!'));
+        if (bonus) add(fb, h('p', { class: 'fb-bonus' }, [icon('link'), 'Reeks van ' + se.combo + '! Extra ster.']));
+        if (nowMastered) add(fb, h('p', { class: 'fb-sub' }, 'Die zit erin!'));
         else if (assisted) add(fb, h('p', { class: 'fb-sub' }, 'Met hulp lukt het. Straks probeer je hem zonder.'));
         helpRow.style.display = 'none';
-        if (res.fast) SND.fast(); else SND.ok();
-        later(next, einkOn() ? 1100 : 850);
+        if (bonus) SND.combo(); else if (res.fast) SND.fast(); else SND.ok();
+        later(next, einkOn() ? (bonus ? 1500 : 1100) : (bonus ? 1250 : 850));
         return;
       }
 
       // fout: uitleg, zelf verbeteren, en later in deze ronde opnieuw
       phase = 'fix';
+      se.combo = 0;
       saveState();
+      drawCombo(); drawClimb();
       if (!se.wrongSeen[k]) { se.wrongSeen[k] = true; se.wrong.push(q); }
       if (q.tries < 2) se.queue.push({ a: q.a, t: q.t, at: se.i + (q.reask ? 2 : 3), tries: q.tries + 1 });
       SND.oops();
@@ -1081,7 +1500,7 @@
 
     keyHandler = onKey;
     root.appendChild(h('div', { class: 'screen practice' }, [
-      topBar(iconButton('close', 'Stoppen', current.back), pebbles, stars),
+      topBar(iconButton('close', 'Stoppen', current.back), climbWrap, [combo, stars]),
       h('div', { class: 'practice-main' }, [
         h('div', { class: 'qzone' }, [eq, fb, helpRow]),
         h('div', { class: 'padzone' }, keypad(onKey))
@@ -1092,7 +1511,7 @@
 
   // ---------- einde van een ronde
   screens.summary = function (p) {
-    var se = p.se;
+    var se = p.se, pr = P();
     var again = function () { go('practice', { tables: se.tables, from: p.from }); };
     current.back = function () {
       if (p.from === 'table' && se.tables.length === 1) go('table', { t: se.tables[0] });
@@ -1103,13 +1522,15 @@
       var t = se.tables[i];
       if (!se.doneBefore[t] && tableDone(t)) summits.push(t);
     }
+    var L0 = levelInfo(se.starsBefore), L1 = levelInfo(pr.stats.stars), up = L1.n > L0.n;
     SND.done();
 
-    var title = summits.length ? 'Op de top van de tafel van ' + listNl(summits) + '!' : 'Klaar!';
+    var title = summits.length ? 'Op de top van de tafel van ' + listNl(summits) + '!' : (se.perfect ? 'Foutloos!' : 'Klaar!');
     var stats = h('div', { class: 'sum-stats' }, [
       h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, se.firstOk + ' van ' + se.len), h('span', { class: 'sum-l' }, 'meteen juist')]),
-      h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, [icon('bolt'), String(se.fast)]), h('span', { class: 'sum-l' }, 'keer bliksemsnel')]),
-      h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, [icon('star'), '+' + se.stars]), h('span', { class: 'sum-l' }, 'sterren')])
+      h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, [icon('bolt'), String(se.fast)]), h('span', { class: 'sum-l' }, 'bliksemsnel')]),
+      h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, [icon('link'), String(se.bestCombo)]), h('span', { class: 'sum-l' }, 'langste reeks')]),
+      h('div', { class: 'sum-stat' }, [h('span', { class: 'sum-n' }, [icon('star'), '+' + se.stars]), h('span', { class: 'sum-l' }, se.bonus ? 'sterren, ' + se.bonus + ' extra' : 'sterren')])
     ]);
 
     function chips(list) {
@@ -1119,22 +1540,231 @@
     }
 
     var blocks = [];
+    var nb = newBadgesBlock(se.newBadges || []);
+    if (nb) blocks.push(nb);
     if (se.mastered.length) blocks.push(h('div', { class: 'sum-block' }, [h('h2', null, 'Deze zitten erin'), chips(se.mastered)]));
     if (se.wrong.length) blocks.push(h('div', { class: 'sum-block' }, [h('h2', null, 'Hier oefenen we nog op'), chips(se.wrong)]));
-    if (!se.wrong.length && !se.mastered.length) blocks.push(h('p', { class: 'sum-quiet' }, 'Geen enkele fout!'));
 
-    root.appendChild(h('div', { class: 'screen summary' }, [
-      topBar(iconButton('back', 'Terug', current.back), null, starBadge(S.stats.stars)),
+    var screen = h('div', { class: 'screen summary' }, [
+      topBar(iconButton('back', 'Terug', current.back), null, starBadge(pr.stats.stars)),
       h('div', { class: 'sum-main' }, [
-        h('div', { class: 'sum-flag' + (summits.length ? ' big' : '') }, icon(summits.length ? 'flag' : 'mountain')),
+        summits.length ? h('div', { class: 'sum-flag big' }, icon('flag')) : null,
         h('h1', null, title),
         stats,
+        h('div', { class: 'sum-lvl-wrap' }, [
+          up ? h('p', { class: 'sum-levelup' }, 'Nieuw niveau: ' + L1.title + '!') : null,
+          levelCard(pr.stats.stars, 'sum-lvl')
+        ]),
         h('div', { class: 'sum-blocks' }, blocks),
         h('div', { class: 'sum-actions' }, [
           h('button', { class: 'btn btn-sun', onclick: again }, h('span', { class: 'btn-title' }, 'Nog een ronde')),
           h('button', { class: 'btn btn-ice', onclick: function () { go('home'); } }, h('span', { class: 'btn-title' }, 'Naar de bergen'))
         ])
       ])
+    ]);
+    root.appendChild(screen);
+    if (summits.length || up || (se.newBadges && se.newBadges.length) || se.perfect) confetti(screen);
+  };
+
+  // ---------- sprint naar de hut: één minuut, alleen sommen die al goed gaan
+  // De hut staat op de plaats van het eigen record: wie de hut haalt, evenaart zijn record.
+  function sprintArt(frac) {
+    var svg = s('svg', { viewBox: '0 0 400 112', class: 'sprint-svg', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' });
+    var path = [[20, 94], [110, 84], [200, 68], [290, 56], [348, 46]];
+    svg.appendChild(s('polygon', { points: pts([[0, 112], [0, 97]].concat(path).concat([[400, 40], [400, 112]])), class: 'sprint-hill' }));
+    svg.appendChild(s('polyline', { points: pts(path), class: 'sprint-path' }));
+    var hx = 356, hy = 44;
+    svg.appendChild(s('rect', { x: hx, y: hy - 4, width: 30, height: 21, class: 'hut-wall' }));
+    svg.appendChild(s('polygon', { points: pts([[hx - 5, hy - 3], [hx + 15, hy - 22], [hx + 35, hy - 3]]), class: 'hut-roof' }));
+    svg.appendChild(s('rect', { x: hx + 11.5, y: hy + 5, width: 7, height: 12, class: 'hut-door' }));
+    var at = partialPath(path, Math.max(0, Math.min(1, frac)));
+    at = at[at.length - 1];
+    svg.appendChild(s('circle', { cx: at[0], cy: at[1] - 9, r: 7.5, class: 'climber' }));
+    return svg;
+  }
+
+  screens.sprint = function (p) {
+    var pr = P(), stats = pr.stats;
+    current.back = function () { go('home'); };
+
+    function knownPool(tables) {
+      var out = [];
+      for (var i = 0; i < tables.length; i++) for (var a = 1; a <= 10; a++) if (box(a, tables[i]) >= 2) out.push({ a: a, t: tables[i] });
+      return out;
+    }
+    var pool = knownPool(pr.settings.tables);
+    if (pool.length < SPRINT_MIN) pool = knownPool([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+    var stars = starBadge(stats.stars);
+    var main = h('div', { class: 'sprint-main' });
+    var screen = h('div', { class: 'screen sprint' }, [
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Sprint naar de hut'), stars),
+      main
+    ]);
+    root.appendChild(screen);
+
+    var phase = 'intro', count = 0, typed = '', q = null, last = [], endAt = 0;
+    var fill, secs, art, eq, fb;
+
+    function target() { return Math.max(10, stats.sprintBest); }
+
+    function intro() {
+      phase = 'intro';
+      main.innerHTML = '';
+      var locked = pool.length < SPRINT_MIN;
+      add(main, h('div', { class: 'sprint-card' }, [
+        h('div', { class: 'sprint-art' }, sprintArt(0)),
+        h('h2', null, locked ? 'Nog even oefenen' : 'Eén minuut. Haal je de hut?'),
+        h('p', null, locked
+          ? 'De sprint gaat open zodra minstens ' + SPRINT_MIN + ' sommen bijna of helemaal in zitten. Nu zijn dat er ' + pool.length + '.'
+          : 'Je krijgt alleen sommen die je al goed kent. Elke juiste som brengt je dichter bij de hut. De hut staat bij je record.'),
+        locked ? null : h('p', { class: 'sprint-record' }, stats.sprintBest ? 'Jouw record: ' + stats.sprintBest + ' sommen' : 'Nog geen record. Zet er een neer!'),
+        locked
+          ? h('button', { class: 'btn btn-sun', onclick: function () { go('practice', { tables: pr.settings.tables.slice(), from: 'home' }); } }, h('span', { class: 'btn-title' }, 'Oefenen'))
+          : h('button', { class: 'btn btn-sun btn-big sprint-go', onclick: run }, h('span', { class: 'btn-title' }, 'Start'))
+      ]));
+    }
+
+    function nextQ() {
+      var choice, tries = 0;
+      do { choice = pick(pool); tries++; } while (tries < 20 && last.indexOf(fkey(choice.a, choice.t)) >= 0);
+      last.push(fkey(choice.a, choice.t));
+      if (last.length > Math.min(3, pool.length - 1)) last.shift();
+      var swap = choice.a !== choice.t && Math.random() < 0.35;
+      q = { a: choice.a, t: choice.t, kind: swap ? 'swap' : 'mul', product: choice.a * choice.t, answer: choice.a * choice.t };
+      q.parts = swap ? [choice.t, TIMES, choice.a, '=', null] : [choice.a, TIMES, choice.t, '=', null];
+      typed = '';
+      drawEq();
+    }
+
+    function drawEq() {
+      eq.innerHTML = '';
+      for (var i = 0; i < q.parts.length; i++) {
+        var part = q.parts[i];
+        if (part === null) eq.appendChild(h('span', { class: 'tok blank' + (typed ? ' filled' : '') }, typed || '\u00a0'));
+        else eq.appendChild(h('span', { class: 'tok ' + (typeof part === 'number' ? 'num' : 'op') }, String(part)));
+      }
+    }
+
+    function drawArt() {
+      art.innerHTML = '';
+      add(art, [sprintArt(count / target()), h('span', { class: 'sprint-count' }, [String(count), h('small', null, count === 1 ? 'som' : 'sommen')])]);
+    }
+
+    function tick() {
+      if (phase === 'end' || phase === 'intro') return;
+      var left = Math.max(0, endAt - Date.now());
+      fill.style.width = (left / SPRINT_MS * 100).toFixed(1) + '%';
+      secs.textContent = Math.ceil(left / 1000) + ' s';
+      if (left <= 0) { finishRun(); return; }
+      later(tick, Math.min(einkOn() ? 5000 : 500, left));
+    }
+
+    function run() {
+      phase = 'run'; count = 0; last = [];
+      endAt = Date.now() + SPRINT_MS;
+      main.innerHTML = '';
+      fill = h('div', { class: 'sprint-fill' });
+      secs = h('span', { class: 'sprint-secs' }, '60 s');
+      art = h('div', { class: 'sprint-run-art' });
+      eq = h('div', { class: 'equation' });
+      fb = h('p', { class: 'sprint-fb' }, '\u00a0');
+      add(main, h('div', { class: 'practice-main' }, [
+        h('div', { class: 'qzone' }, [
+          h('div', { class: 'sprint-timer' }, [h('div', { class: 'sprint-track' }, fill), secs]),
+          art, eq, fb
+        ]),
+        h('div', { class: 'padzone' }, keypad(onKey))
+      ]));
+      keyHandler = onKey;
+      drawArt();
+      nextQ();
+      tick();
+    }
+
+    function onKey(key) {
+      if (phase !== 'run') return;
+      if (key === 'del') { typed = typed.slice(0, -1); drawEq(); return; }
+      if (key !== 'ok') { if (typed.length < 3) { typed += key; drawEq(); } return; }
+      if (!typed) return;
+      if (parseInt(typed, 10) === q.answer) {
+        count++;
+        SND.tick();
+        fb.className = 'sprint-fb';
+        fb.textContent = '\u00a0';
+        drawArt();
+        nextQ();
+        return;
+      }
+      // Fout in de sprint: de som komt binnenkort terug bij gewoon oefenen.
+      var f = P().facts[fkey(q.a, q.t)];
+      if (f) { if (f.b >= 3) f.b--; f.due = Date.now(); }
+      SND.oops();
+      phase = 'pause';
+      fb.className = 'sprint-fb show';
+      fb.textContent = eqText(q);
+      later(function () {
+        if (phase !== 'pause') return;
+        phase = 'run';
+        fb.className = 'sprint-fb';
+        fb.textContent = '\u00a0';
+        nextQ();
+      }, 1100);
+    }
+
+    function finishRun() {
+      phase = 'end';
+      keyHandler = null;
+      var best = stats.sprintBest, rec = count > best;
+      stats.sprints++;
+      if (rec) stats.sprintBest = count;
+      addStars(count);
+      markDay();
+      var got = awardBadges();
+      saveState();
+      SND.done();
+      var n = stars.getElementsByTagName('span');
+      for (var i = 0; i < n.length; i++) if (n[i].className === 'stars-n') n[i].textContent = String(stats.stars);
+      main.innerHTML = '';
+      add(main, h('div', { class: 'sprint-card' }, [
+        h('div', { class: 'sprint-art' }, sprintArt(count / Math.max(10, best))),
+        h('h2', null, 'De tijd is om!'),
+        h('p', { class: 'sprint-score' }, count + (count === 1 ? ' som juist' : ' sommen juist')),
+        h('p', { class: 'sprint-record' + (rec ? ' rec' : '') }, rec ? (best ? 'Nieuw record! Je vorige record was ' + best + '.' : 'Je eerste record!') : 'Jouw record blijft ' + best + '.'),
+        h('p', { class: 'sprint-stars' }, [icon('star'), '+' + count]),
+        newBadgesBlock(got),
+        h('div', { class: 'sum-actions' }, [
+          h('button', { class: 'btn btn-sun', onclick: function () { go('sprint', { now: true }); } }, h('span', { class: 'btn-title' }, 'Nog eens')),
+          h('button', { class: 'btn btn-ice', onclick: function () { go('home'); } }, h('span', { class: 'btn-title' }, 'Naar de bergen'))
+        ])
+      ]));
+      if (rec || got.length) confetti(screen);
+    }
+
+    if (p && p.now && pool.length >= SPRINT_MIN) run(); else intro();
+  };
+
+  // ---------- medailles en records
+  screens.medals = function () {
+    current.back = function () { go('home'); };
+    var st = P().stats, grid = h('div', { class: 'medal-grid' });
+    for (var i = 0; i < BADGES.length; i++) {
+      var b = BADGES[i], won = !!st.badges[b.id];
+      grid.appendChild(h('div', { class: 'medal-card' + (won ? ' won' : '') }, [
+        medal(b, won), h('span', { class: 'mc-title' }, b.title), h('span', { class: 'mc-text' }, b.text)
+      ]));
+    }
+    var recs = h('div', { class: 'records' }, [
+      h('div', { class: 'record' }, [h('span', { class: 'rec-n' }, [icon('link'), String(st.bestCombo)]), h('span', { class: 'rec-l' }, 'langste reeks')]),
+      h('div', { class: 'record' }, [h('span', { class: 'rec-n' }, [icon('hut'), String(st.sprintBest)]), h('span', { class: 'rec-l' }, 'sprintrecord')]),
+      h('div', { class: 'record' }, [h('span', { class: 'rec-n' }, [icon('sun'), String(st.bestStreak)]), h('span', { class: 'rec-l' }, 'dagen na elkaar')]),
+      h('div', { class: 'record' }, [h('span', { class: 'rec-n' }, [icon('flag'), String(summitsCount())]), h('span', { class: 'rec-l' }, 'toppen')])
+    ]);
+    root.appendChild(h('div', { class: 'screen medals' }, [
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Mijn medailles'), starBadge(st.stars)),
+      recs,
+      h('p', { class: 'chart-sum' }, badgeCount() + ' van de ' + BADGES.length + ' medailles verdiend'),
+      h('div', { class: 'medal-wrap' }, grid)
     ]));
   };
 
@@ -1160,17 +1790,17 @@
     var n = masteredTotal();
 
     root.appendChild(h('div', { class: 'screen chartscreen' }, [
-      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Mijn tafelkaart'), starBadge(S.stats.stars)),
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Mijn tafelkaart'), starBadge(P().stats.stars)),
       h('p', { class: 'chart-sum' }, n === 1 ? '1 van de 100 sommen zit erin.' : n + ' van de 100 sommen zitten erin.'),
       h('div', { class: 'chart-wrap' }, [h('p', { class: 'chart-axis' }, 'Elke rij is een tafel. Tik op een getal links om die tafel te openen.'), grid]),
       legend
     ]));
   };
 
-  // ---------- instellingen (voor ouders)
+  // ---------- instellingen: per speler en voor het toestel
   screens.settings = function () {
     current.back = function () { go('home'); };
-    var st = S.settings;
+    var pr = P(), st = pr.settings;
 
     function toggle(label, note, get, set) {
       var btn = h('button', { class: 'switch' + (get() ? ' on' : ''), role: 'switch', 'aria-checked': get() ? 'true' : 'false', 'aria-label': label });
@@ -1184,28 +1814,27 @@
       return h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, label), note ? h('span', { class: 'set-note' }, note) : null]), btn]);
     }
 
-    var nameInput = h('input', { type: 'text', class: 'name-input', value: st.name, maxlength: '20', autocomplete: 'off', 'aria-label': 'Naam' });
-    nameInput.addEventListener('input', function () { st.name = nameInput.value.replace(/^\s+|\s+$/g, ''); saveState(); }, false);
-
-    var tableChips = h('div', { class: 'table-chips' });
-    function drawTableChips() {
-      tableChips.innerHTML = '';
-      for (var t = 1; t <= 10; t++) {
-        (function (tt) {
-          var on = st.tables.indexOf(tt) >= 0;
-          tableChips.appendChild(h('button', {
-            class: 'tchip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false',
-            onclick: function () {
-              var idx = st.tables.indexOf(tt);
-              if (idx >= 0) { if (st.tables.length > 1) st.tables.splice(idx, 1); }
-              else { st.tables.push(tt); st.tables.sort(function (x, y) { return x - y; }); }
-              saveState(); drawTableChips();
-            }
-          }, String(tt)));
-        })(t);
-      }
+    function twoTap(label, confirmLabel, action) {
+      var btn = h('button', { class: 'btn btn-line' }, label), armed = false;
+      btn.addEventListener('click', function () {
+        if (!armed) {
+          armed = true;
+          btn.innerHTML = '';
+          add(btn, confirmLabel);
+          btn.className = 'btn btn-line danger';
+          return;
+        }
+        action();
+      }, false);
+      return btn;
     }
-    drawTableChips();
+
+    var nameInput = h('input', { type: 'text', class: 'name-input', value: pr.name, maxlength: '20', autocomplete: 'off', 'aria-label': 'Naam' });
+    var headName = h('span', null, pr.name);
+    nameInput.addEventListener('input', function () {
+      var v = nameInput.value.replace(/^\s+|\s+$/g, '');
+      if (v) { pr.name = v; headName.textContent = v; saveState(); }
+    }, false);
 
     var lenWrap = h('div', { class: 'seg' });
     function drawLen() {
@@ -1219,41 +1848,48 @@
     }
     drawLen();
 
-    var resetBtn = h('button', { class: 'btn btn-line' }, 'Voortgang wissen');
-    var armed = false;
-    resetBtn.addEventListener('click', function () {
-      if (!armed) {
-        armed = true;
-        resetBtn.innerHTML = '';
-        add(resetBtn, 'Zeker? Tik nog eens om alles te wissen');
-        resetBtn.className = 'btn btn-line danger';
-        return;
-      }
-      S.facts = {};
-      S.stats = defaultState().stats;
+    var resetBtn = twoTap('Voortgang wissen', 'Zeker? Tik nog eens', function () {
+      pr.facts = {};
+      pr.stats = defaultStats();
       saveState();
       go('home');
-    }, false);
+    });
+    var removeBtn = twoTap('Speler verwijderen', 'Zeker? Tik nog eens', function () {
+      delete S.profiles[pr.id];
+      S.order.splice(S.order.indexOf(pr.id), 1);
+      S.current = S.order.length ? S.order[0] : null;
+      saveState();
+      go(S.order.length ? 'who' : 'newPlayer');
+    });
 
     root.appendChild(h('div', { class: 'screen settings' }, [
       topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Instellingen'), null),
       h('div', { class: 'set-main' }, [
         h('div', { class: 'set-col' }, [
+          h('h2', { class: 'set-head' }, [avatar(pr), headName]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, h('span', { class: 'set-label' }, 'Naam')), nameInput]),
-          h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Tafels bij Oefenen'), h('span', { class: 'set-note' }, 'Kies de tafels die in de klas al aan bod kwamen.'), tableChips]),
+          h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Kleur'), colorChooser(function () { return pr.color; }, function (c) { pr.color = c; saveState(); })]),
+          h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Tafels bij Oefenen'), h('span', { class: 'set-note' }, 'Kies de tafels die in de klas al aan bod kwamen.'), tableChooser(st.tables, saveState)]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, h('span', { class: 'set-label' }, 'Sommen per ronde')), lenWrap]),
           toggle('Deelsommen meeoefenen', 'Zoals 12 : 3. Pas als de maalsom al goed gaat.', function () { return !!st.div; }, function (v) { st.div = v; }),
-          toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { st.eink = v; applyTheme(); }),
           toggle('Geluid', null, function () { return !!st.sound; }, function (v) { st.sound = v; }),
-          h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Opnieuw beginnen'), h('span', { class: 'set-note' }, 'Wist alle niveaus en sterren.')]), resetBtn])
+          h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Opnieuw beginnen'), h('span', { class: 'set-note' }, 'Wist alle niveaus, sterren en medailles van ' + pr.name + '.')]), resetBtn]),
+          h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Speler verwijderen'), h('span', { class: 'set-note' }, 'Haalt ' + pr.name + ' en alle voortgang weg.')]), removeBtn]),
+          h('h2', { class: 'set-head' }, 'Dit toestel'),
+          toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { S.device.eink = v; applyTheme(); }),
+          h('div', { class: 'set-row' }, [
+            h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Spelers'), h('span', { class: 'set-note' }, S.order.length === 1 ? '1 speler op dit toestel.' : S.order.length + ' spelers op dit toestel.')]),
+            h('button', { class: 'btn btn-line', onclick: function () { go('newPlayer'); } }, 'Speler toevoegen')
+          ])
         ]),
         h('div', { class: 'set-col parents' }, [
           h('h2', null, 'Voor ouders'),
           h('p', null, 'Tafelberg volgt de opbouw uit de klas. Eerst begrijpen: elke som is een aantal groepjes, getoond als stippen in bakjes. Dan slim afleiden vanuit de steunpunttafels 1, 2, 5 en 10. Pas daarna komt het vlot onthouden.'),
           h('p', null, 'Elke som heeft een eigen niveau. Wie een som juist en vlot beantwoordt (binnen een vijftal seconden, typen inbegrepen), gaat een niveau hoger. Die som komt dan pas later terug: na een dag, daarna na twee, vier en negen dagen. Bij een fout zakt de som. Uw kind ziet meteen hoe het zit, typt de juiste uitkomst over en krijgt dezelfde som later in de ronde nog eens.'),
-          h('p', null, 'Er loopt geen klok in beeld. Snelheid telt mee, maar wordt enkel beloond met een bliksem. Nieuwe sommen komen in kleine porties, tussen sommen die al goed gaan. Een som zit erin als ze over enkele dagen heen telkens vlot juist was.'),
-          h('p', null, 'Elke dag een korte ronde werkt beter dan af en toe lang oefenen.'),
-          h('p', { class: 'set-small' }, 'Gedaan: ' + S.stats.rounds + (S.stats.rounds === 1 ? ' ronde' : ' rondes') + ' op ' + S.stats.days + (S.stats.days === 1 ? ' dag' : ' dagen') + '. ' + masteredTotal() + ' van de 100 sommen zitten erin.')
+          h('p', null, 'Bij gewoon oefenen loopt er geen klok in beeld. Snelheid telt mee, maar wordt enkel beloond met een bliksem. Sterren komen er voor elk juist antwoord, met een extra ster per reeks van vijf. Zo telt nauwkeurig werken meer dan haast.'),
+          h('p', null, 'De sprint is een vrijwillige uitdaging van één minuut met alleen sommen die al goed gaan. Het kind wedijvert er met zijn eigen record, niet met anderen. Een fout in de sprint stuurt de som terug naar het gewone oefenen.'),
+          h('p', null, 'Elke dag een korte ronde werkt beter dan af en toe lang oefenen. Daarom telt Tafelberg de dagen op rij.'),
+          h('p', { class: 'set-small' }, pr.name + ': ' + pr.stats.rounds + (pr.stats.rounds === 1 ? ' ronde' : ' rondes') + ' op ' + pr.stats.days + (pr.stats.days === 1 ? ' dag' : ' dagen') + ', ' + masteredTotal() + ' van de 100 sommen zitten erin.')
         ])
       ])
     ]));
@@ -1267,19 +1903,25 @@
     window.addEventListener('resize', fitRoot, false);
     window.addEventListener('orientationchange', function () { window.setTimeout(fitRoot, 200); }, false);
     document.addEventListener('contextmenu', function (e) { e.preventDefault(); }, false);
-    go('home');
+    if (!S.order.length) go('newPlayer');
+    else if (S.order.length > 1) go('who');
+    else go('home');
   }
 
   // Voor tests in een gewone browser.
   window.Tafelberg = {
     state: function () { return S; },
+    profile: function () { return P(); },
     grade: function (q, ok, ms, assisted) { return grade(q, ok, ms, assisted); },
     makeQuestion: makeQuestion,
     newSession: newSession,
     pickNext: pickNext,
     strategy: strategy,
+    levelInfo: levelInfo,
+    award: awardBadges,
     go: go,
-    reload: function () { S = loadState(); applyTheme(); go('home'); }
+    save: saveState,
+    reload: function () { S = loadState(); applyTheme(); go(S.order.length ? 'home' : 'newPlayer'); }
   };
 
   boot();

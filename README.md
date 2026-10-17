@@ -1,17 +1,31 @@
 # Tafelberg
 
-Een maaltafelspel voor het tweede leerjaar, gemaakt voor Hector. Elke tafel is een berg. Wie de sommen van een tafel vlot kent, klimt naar de top en plant er een vlag.
+Een maaltafelspel voor het tweede leerjaar. Elke tafel is een berg. Wie de sommen van een tafel vlot kent, klimt naar de top en plant er een vlag.
+
+Meerdere kinderen kunnen op hetzelfde toestel spelen. Bij de start kies je wie er klimt, en elke speler heeft een eigen voortgang, eigen tafels en eigen medailles.
 
 Het spel draait volledig offline als Android-app en is afgestemd op twee toestellen: een Samsung Galaxy Tab S3 (kleur, liggend of staand) en een Boox Note (e-ink, meestal staand). Op een Boox start het vanzelf in een zwart-witweergave zonder beweging.
 
 ## Wat zit erin
 
-- **Bergen**: het startscherm toont de tien tafels als een bergketen. Het gele pad op elke berg toont hoe ver hij al geklommen is.
+- **Spelers**: bij de eerste start maak je een speler aan met naam, kleur en de tafels waarmee hij of zij begint. Later voeg je er meer toe.
+- **Bergen**: het startscherm toont de tien tafels als een bergketen. Het gele pad op elke berg toont hoe ver de speler al geklommen is.
 - **Tafel bekijken**: per som een stippenmodel met groepjes, de som als herhaald optellen, en een tip om ze slim af te leiden.
 - **Klim de tafelrij**: de tafel als telrij opzeggen, steen per steen naar de top, en daarna achteruit naar beneden.
-- **Oefenen**: korte rondes met een eigen toetsenblok. Gemengd over de gekozen tafels of per tafel.
+- **Oefenen**: korte rondes met een eigen toetsenblok. Gemengd over de gekozen tafels of per tafel. Een klimmertje gaat bij elke som een stap hoger.
+- **Sprint naar de hut**: één minuut zoveel mogelijk sommen. De hut staat bij het eigen record. Alleen sommen die al goed gaan doen mee, en de sprint gaat pas open als er genoeg zijn.
+- **Medailles**: vijftien medailles, van de eerste ronde tot alle toppen, plus records voor de langste reeks, de sprint en het aantal dagen op rij.
 - **Mijn tafelkaart**: alle honderd sommen in één rooster, gekleurd volgens hoe goed ze zitten.
-- **Instellingen**: naam, welke tafels meetellen, lengte van een ronde, deelsommen, e-inkweergave, geluid.
+- **Instellingen**: per speler de naam, kleur, tafels, lengte van een ronde, deelsommen en geluid; voor het toestel de e-inkweergave.
+
+## Spelelementen
+
+De spelelementen belonen inzet en nauwkeurigheid, niet alleen snelheid.
+
+- **Sterren** voor elk juist antwoord, en een extra ster bij elke reeks van vijf juiste antwoorden na elkaar. Een fout breekt de reeks, maar kost geen sterren.
+- **Klimniveaus** met tien titels, van Wandelaar tot Tafelkoning, op basis van het aantal sterren.
+- **Dagen op rij**: een zonnetje in de hoek telt hoeveel dagen na elkaar er geoefend is. Korte dagelijkse rondes werken beter dan af en toe lang oefenen.
+- **Feest** op het eindscherm bij een nieuwe top, een nieuw niveau, een foutloze ronde of een nieuwe medaille. Op e-ink blijft het bij tekst, zonder beweging.
 
 ## Didactische opbouw
 
@@ -27,7 +41,7 @@ Verder:
 - **Fouten als leermoment.** Na een fout ziet het kind meteen het stippenmodel en een hint, typt het de juiste uitkomst zelf over, en krijgt het dezelfde som enkele vragen later opnieuw. Veelvoorkomende fouten krijgen gerichte uitleg, zoals optellen in plaats van vermenigvuldigen of één groepje te veel.
 - **Hulp vragen mag.** De knop Hulp toont het model zonder de uitkomst. Een som met hulp telt als nog niet gekend, zonder dat het als fout voelt.
 - **Afwisseling in vorm.** Sommen die al goed gaan, komen ook als wisselsom (3 × 4 naast 4 × 3) en met een ontbrekend getal (? × 4 = 12). Deelsommen (12 : 3) kunnen in de instellingen aan.
-- **Geen klok in beeld.** Snelheid telt mee voor het niveau, maar wordt enkel zichtbaar als beloning (een bliksem). Fouten worden nooit in rood getoond.
+- **Geen klok in beeld bij het oefenen.** Snelheid telt mee voor het niveau, maar wordt enkel zichtbaar als beloning (een bliksem). Fouten worden nooit in rood getoond. Wie de klok wil, kiest zelf voor de sprint; daar wedijvert het kind met zijn eigen record. Een fout in de sprint stuurt de som terug naar het gewone oefenen.
 
 ## Installeren
 

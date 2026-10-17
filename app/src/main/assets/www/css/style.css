@@ -383,16 +383,19 @@ button:focus-visible { outline: 0.2rem solid #2F6FD0; outline-offset: 0.15rem; }
 .end-card .btn + .btn { margin-top: 0.6rem; }
 
 /* ---------- einde van een ronde */
-.sum-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 0; overflow-y: auto; padding: 0.4rem 0; }
+.sum-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.4rem 0; }
+.sum-main > :first-child { margin-top: auto; }
+.sum-main > :last-child { margin-bottom: auto; }
 .sum-flag .icon { width: 4.2rem; height: 4.2rem; color: #4F6086; }
 .sum-flag.big .icon { width: 6rem; height: 6rem; color: #1F2A44; }
-.summary h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem; line-height: 1.1; margin: 0.3rem 0 0.9rem; max-width: 30rem; }
+.summary h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem; line-height: 1.1; margin: 0.1rem 0 0.7rem; max-width: 34rem; }
 .sum-stats { display: flex; justify-content: center; flex-wrap: wrap; }
 .sum-stat { background: #FFFFFF; border-radius: 1.2rem; border: 0.13rem solid #D9E4EE; padding: 0.6rem 1.2rem 0.7rem; margin: 0.3rem; min-width: 9.5rem; }
 .sum-n { display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.1rem; line-height: 1.1; }
 .sum-n .icon { width: 1.9rem; height: 1.9rem; color: #F2B705; margin-right: 0.25rem; }
 .sum-l { display: block; font-size: 1rem; color: #3E4C6B; }
-.sum-blocks { margin-top: 0.6rem; max-width: 40rem; }
+.sum-blocks { margin-top: 0.4rem; max-width: 46rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+.sum-blocks .sum-block { margin: 0 0.9rem; max-width: 26rem; }
 .sum-block h2 { font-size: 1.15rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
 .sum-quiet { font-size: 1.15rem; margin-top: 0.6rem; color: #3E4C6B; }
 .chips { display: flex; flex-wrap: wrap; justify-content: center; }
@@ -481,6 +484,266 @@ button:focus-visible { outline: 0.2rem solid #2F6FD0; outline-offset: 0.15rem; }
 .parents p { font-size: 1rem; line-height: 1.5; margin-bottom: 0.55rem; max-width: 34rem; }
 .set-small { color: #3E4C6B; font-size: 0.92rem !important; }
 
+
+/* ---------- spelers */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1;
+  border: 0.15rem solid #FFFFFF;
+}
+.avatar.big { width: 4.8rem; height: 4.8rem; font-size: 2.4rem; border-width: 0.25rem; }
+.avatar-new { background: #FFFFFF; border: 0.18rem dashed #8EA3C4; color: #1F2A44; }
+.avatar-new .icon { width: 2rem; height: 2rem; }
+.player-chip {
+  display: flex;
+  align-items: center;
+  background: #FFFFFF;
+  border: 0.13rem solid #C9D8E6;
+  border-bottom-width: 0.3rem;
+  border-radius: 2rem;
+  padding: 0.25rem 0.8rem 0.25rem 0.3rem;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1.3rem;
+  max-width: 50%;
+}
+.player-chip .player-name { margin: 0 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-chip .icon { width: 1.2rem; height: 1.2rem; color: #5D6F93; }
+.chip-days {
+  display: flex;
+  align-items: center;
+  background: #FFFFFF;
+  border-radius: 2rem;
+  padding: 0.35rem 0.85rem 0.35rem 0.5rem;
+  border: 0.13rem solid #F2C9A0;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.chip-days .icon { width: 1.6rem; height: 1.6rem; color: #E07B24; margin-right: 0.3rem; }
+.icon .thin { stroke-width: 2; }
+
+/* ---------- klimniveau */
+.lvl { display: flex; align-items: center; }
+.lvl-n {
+  flex: 0 0 auto;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  background: #1F2A44;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin-right: 0.7rem;
+  border: 0.2rem solid #F2B705;
+}
+.lvl-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.lvl-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.35rem; line-height: 1.1; }
+.lvl-bar { height: 0.7rem; border-radius: 0.35rem; background: #D3E0EC; margin: 0.3rem 0 0.2rem; overflow: hidden; }
+.lvl-fill { height: 100%; background: #F2B705; border-radius: 0.35rem; }
+.lvl-need { font-size: 0.95rem; color: #33415F; }
+.home-lvl { width: 20rem; max-width: 100%; margin-top: 0.7rem; background: rgba(255, 255, 255, 0.72); border-radius: 1.4rem 1rem 1rem 1.4rem; padding: 0.45rem 0.9rem 0.45rem 0.45rem; }
+.hello-hint { font-size: 1.05rem; margin-top: 0.6rem; color: #33415F; }
+
+/* ---------- knoppen onderaan het startscherm */
+.home-actions .btn-main { flex: 1.7 1 0; flex-direction: column; }
+.home-actions .btn-tile { flex: 1 1 0; flex-direction: column; font-size: 1.15rem; padding: 0.4rem 0.4rem; }
+.home-actions .btn-tile .icon { width: 1.9rem; height: 1.9rem; margin: 0 0 0.25rem; }
+.btn-tile .icon-hut .hole { fill: #FFFFFF; }
+
+/* ---------- wie speelt er */
+.who-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
+.who-main h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.8rem; margin-bottom: 1.4rem; text-align: center; }
+.who-cards { display: flex; flex-wrap: wrap; justify-content: center; max-width: 46rem; }
+.who-card {
+  width: 11.5rem;
+  margin: 0.5rem;
+  padding: 1.1rem 0.6rem 0.9rem;
+  background: #FFFFFF;
+  border-radius: 1.6rem;
+  border: 0.13rem solid #C9D8E6;
+  border-bottom-width: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.who-card:active { border-bottom-width: 0.13rem; }
+.who-card.cur { border-color: #F2B705; }
+.who-name { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.5rem; margin-top: 0.5rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who-lvl { font-size: 1rem; color: #33415F; }
+.who-stars { display: flex; align-items: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.15rem; margin-top: 0.3rem; }
+.who-stars .icon { width: 1.2rem; height: 1.2rem; color: #F2B705; margin-right: 0.25rem; }
+.who-new { border-style: dashed; border-bottom-width: 0.13rem; justify-content: center; }
+.who-new .who-name { white-space: normal; text-align: center; line-height: 1.1; }
+.screen.who, .screen.newplayer { position: relative; overflow: hidden; }
+.screen.who { background: #C4E0F3; background: linear-gradient(to bottom, #B8D9F0 0%, #E3F0F9 100%); }
+.screen.newplayer { background: #C4E0F3; background: linear-gradient(to bottom, #B8D9F0 0%, #E3F0F9 100%); }
+.who-main, .np-main, .screen.who .bar, .screen.newplayer .bar { position: relative; z-index: 1; }
+.deco { position: absolute; left: 0; right: 0; bottom: 0; z-index: 0; }
+.deco .range-svg { display: block; width: 100%; height: auto; }
+
+/* ---------- nieuwe speler */
+.np-main { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; overflow-y: auto; padding: 0.4rem 0; }
+.np-card { width: 40rem; max-width: 100%; background: #FFFFFF; border-radius: 1.6rem; border: 0.12rem solid #D9E4EE; padding: 1.2rem 1.5rem 1.4rem; }
+.np-intro { font-size: 1.15rem; margin-bottom: 0.9rem; }
+.np-row { display: flex; align-items: center; margin-bottom: 0.9rem; }
+.np-preview { margin-right: 1.1rem; }
+.np-field { margin-bottom: 0.9rem; }
+.np-field.grow { flex: 1 1 auto; margin-bottom: 0; }
+.name-input.big { width: 100%; font-size: 1.6rem; padding: 0.45rem 0.8rem; margin-top: 0.3rem; }
+.swatches { display: flex; flex-wrap: wrap; margin-top: 0.4rem; }
+.swatch { width: 2.7rem; height: 2.7rem; border-radius: 50%; margin: 0.2rem; border: 0.25rem solid #FFFFFF; box-shadow: 0 0 0 0.13rem #C9D8E6; }
+.swatch.on { box-shadow: 0 0 0 0.22rem #1F2A44; }
+.np-start { width: 100%; margin-top: 0.4rem; min-height: 4.2rem; font-size: 1.7rem; }
+.np-start.off { opacity: 0.45; }
+
+/* ---------- klimbalk en reeks tijdens een ronde */
+.climb-wrap { width: 100%; max-width: 24rem; }
+.climb { display: block; width: 100%; height: 3.2rem; }
+.climb-hill { fill: #D6E4F0; }
+.climb-line { stroke: #FFFFFF; stroke-width: 2.5; stroke-linecap: round; }
+.climb-stop { fill: #FFFFFF; stroke: #A9C1D8; stroke-width: 1.5; }
+.climb-stop.on { fill: #5D6F93; stroke: #5D6F93; }
+.climb-stop.now { stroke: #1F2A44; stroke-width: 2.2; }
+.climb-pole { stroke: #1F2A44; stroke-width: 1.6; stroke-linecap: round; }
+.climb .climber { stroke-width: 1.6; }
+.combo { display: none; }
+.combo.on {
+  display: flex;
+  align-items: center;
+  background: #FFF2CF;
+  border: 0.13rem solid #EBD48F;
+  border-radius: 2rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.5rem;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.combo .icon { width: 1.5rem; height: 1.5rem; color: #8A6100; margin-right: 0.3rem; }
+.fb-bonus { display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.4rem; color: #7A5600; margin-top: 0.5rem; }
+.fb-bonus .icon { width: 1.6rem; height: 1.6rem; margin-right: 0.4rem; }
+
+/* ---------- eindscherm: niveau en medailles */
+.sum-lvl-wrap { display: flex; flex-direction: column; align-items: center; margin-top: 0.8rem; }
+.sum-levelup { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.5rem; background: #F2B705; border-radius: 2rem; padding: 0.25rem 1.2rem; margin-bottom: 0.5rem; }
+.lvl.sum-lvl { width: 24rem; max-width: 100%; background: #FFFFFF; border: 0.13rem solid #D9E4EE; border-radius: 1.4rem 1rem 1rem 1.4rem; padding: 0.45rem 0.9rem 0.45rem 0.45rem; text-align: left; }
+.new-badges { display: flex; flex-wrap: wrap; justify-content: center; }
+.new-badge { display: flex; flex-direction: column; align-items: center; margin: 0 0.6rem; }
+.new-badge .medal { width: 3.4rem; height: 4rem; }
+.nb-title { font-family: 'Fredoka', sans-serif; font-weight: 500; font-size: 1.05rem; }
+.end-card .sum-block { margin: -0.3rem 0 0.8rem; }
+.end-card .sum-block h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem; }
+
+/* ---------- medailles */
+.medal { display: block; }
+.ribbon-a { fill: #D33F49; }
+.ribbon-b { fill: #2F6FD0; }
+.disc { fill: #E4AC00; }
+.disc-in { fill: #F7C83A; }
+.micon { color: #1F2A44; }
+.micon .fill { fill: currentColor; }
+.micon .soft { opacity: 0.5; }
+.micon .line { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.micon .thin { stroke-width: 2; }
+.micon .hole { fill: #F7C83A; }
+.medal.locked .ribbon-a, .medal.locked .ribbon-b { fill: #D3DCE5; }
+.medal.locked .disc { fill: #D9E2EB; }
+.medal.locked .disc-in { fill: #EEF3F7; }
+.medal.locked .micon { color: #A9B7C6; }
+.medal.locked .micon .hole { fill: #EEF3F7; }
+.records { display: flex; justify-content: center; flex-wrap: wrap; flex: 0 0 auto; margin-bottom: 0.4rem; }
+.record { background: #FFFFFF; border: 0.13rem solid #D9E4EE; border-radius: 1.1rem; padding: 0.35rem 1rem 0.45rem; margin: 0.25rem; min-width: 8.5rem; text-align: center; }
+.rec-n { display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.7rem; line-height: 1.15; }
+.rec-n .icon { width: 1.5rem; height: 1.5rem; margin-right: 0.3rem; color: #5D6F93; }
+.rec-l { display: block; font-size: 0.92rem; color: #3E4C6B; }
+.medal-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.medal-grid { display: flex; flex-wrap: wrap; justify-content: center; }
+.medal-card {
+  width: 18.5%;
+  margin: 0.25rem 0.35%;
+  background: #FFFFFF;
+  border: 0.13rem solid #D9E4EE;
+  border-radius: 1.2rem;
+  padding: 0.5rem 0.4rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.medal-card .medal { width: 3rem; height: 3.5rem; }
+.medal-card.won { border-color: #EBD48F; }
+.mc-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.1rem; line-height: 1.15; margin-top: 0.2rem; }
+.mc-text { font-size: 0.85rem; color: #3E4C6B; line-height: 1.25; margin-top: 0.15rem; }
+.medal-card:not(.won) .mc-title { color: #6A7894; }
+
+/* ---------- sprint */
+.sprint-main { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; align-items: stretch; min-height: 0; }
+.sprint-card { width: 36rem; max-width: 100%; margin: 0 auto; background: #FFFFFF; border: 0.13rem solid #D9E4EE; border-radius: 1.6rem; padding: 1rem 1.4rem 1.3rem; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.sprint-card h2 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.9rem; line-height: 1.15; margin-top: 0.3rem; }
+.sprint-card p { font-size: 1.12rem; margin-top: 0.5rem; max-width: 30rem; }
+.sprint-card .btn { margin-top: 1rem; min-width: 14rem; }
+.sprint-art { width: 100%; height: 8rem; position: relative; }
+.sprint-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.sprint-hill { fill: #D6E4F0; }
+.sprint-path { fill: none; stroke: #FFFFFF; stroke-width: 3.5; stroke-dasharray: 1 8; stroke-linecap: round; stroke-linejoin: round; }
+.hut-wall { fill: #B86B3E; }
+.hut-roof { fill: #D33F49; }
+.hut-door { fill: #6A3A1F; }
+.sprint-record { font-weight: 700; }
+.sprint-record.rec { color: #2D7A4D; }
+.sprint-score { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem !important; line-height: 1.1; margin-top: 0.2rem !important; }
+.sprint-stars { display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.5rem !important; }
+.sprint-stars .icon { width: 1.6rem; height: 1.6rem; color: #F2B705; margin-right: 0.3rem; }
+.sprint-go { font-size: 1.8rem; }
+.sprint-timer { display: flex; align-items: center; margin-top: 0.4rem; }
+.sprint-track { flex: 1 1 auto; height: 1.1rem; border-radius: 0.55rem; background: #D3E0EC; overflow: hidden; }
+.sprint-fill { height: 100%; background: #F2B705; width: 100%; }
+.sprint-secs { flex: 0 0 auto; min-width: 3.6rem; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.35rem; }
+.sprint-run-art { position: relative; height: 7.5rem; margin-top: 0.4rem; }
+.sprint-count { position: absolute; left: 0.4rem; top: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem; line-height: 1; }
+.sprint-count small { font-size: 1.1rem; margin-left: 0.35rem; font-weight: 500; }
+.sprint-fb { min-height: 2.8rem; text-align: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.8rem; color: #7A4A00; visibility: hidden; }
+.sprint-fb.show { visibility: visible; }
+
+/* ---------- feest */
+.confetti { position: fixed; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+.confetti .bit {
+  position: absolute;
+  top: -2rem;
+  width: 0.55rem;
+  height: 0.95rem;
+  border-radius: 0.1rem;
+  -webkit-animation-name: tb-fall;
+  animation-name: tb-fall;
+  -webkit-animation-timing-function: linear;
+  animation-timing-function: linear;
+  -webkit-animation-fill-mode: forwards;
+  animation-fill-mode: forwards;
+}
+.confetti .bit.round { width: 0.7rem; height: 0.7rem; border-radius: 50%; }
+@-webkit-keyframes tb-fall { to { -webkit-transform: translateY(110vh) rotate(600deg); transform: translateY(110vh) rotate(600deg); } }
+@keyframes tb-fall { to { -webkit-transform: translateY(110vh) rotate(600deg); transform: translateY(110vh) rotate(600deg); } }
+
+/* ---------- instellingen: koppen */
+.set-head { display: flex; align-items: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.45rem; margin: 0.3rem 0 0.5rem; }
+.set-head .avatar { margin-right: 0.6rem; }
+.set-col .set-head + .set-row { margin-top: 0; }
+
 /* ---------- staand (Boox, tablet rechtop) */
 html.port .hello h1 { font-size: 2.7rem; }
 html.port .sun { right: 2rem; width: 5rem; height: 5rem; }
@@ -509,6 +772,21 @@ html.port .ladder .key { height: 4.2rem; }
 html.port .cell, html.port .chart-h, html.port .chart-t, html.port .chart-corner { width: 3.15rem; height: 3.15rem; font-size: 1.15rem; }
 html.port .set-main { flex-direction: column; }
 html.port .set-col { flex: 0 0 auto; margin: 0 0 0.6rem; }
+
+
+html.port .hello-hint { display: none; }
+html.port .home-lvl { width: 17rem; margin-top: 0.5rem; }
+html.port .home-actions .btn-main .btn-title { font-size: 1.6rem; }
+html.port .home-actions .btn-tile { font-size: 1rem; }
+html.port .who-card { width: 10rem; }
+html.port .medal-card { width: 31.5%; margin: 0.25rem 0.9%; }
+html.port .record { min-width: 0; width: 23%; margin: 0.25rem 1%; padding: 0.3rem 0.4rem 0.4rem; }
+html.port .rec-n { font-size: 1.5rem; }
+html.port .climb-wrap { max-width: 17rem; }
+html.port .sum-stat { min-width: 0; width: 23%; margin: 0.25rem 1%; padding: 0.45rem 0.3rem 0.55rem; }
+html.port .sum-n { font-size: 1.7rem; }
+html.port .sum-l { font-size: 0.88rem; }
+html.port .np-card { padding: 1rem 1.1rem 1.2rem; }
 
 /* ---------- e-ink: zwart op wit, geen beweging, geen verlopen */
 html.eink, html.eink body { background: #FFFFFF; color: #000000; }
@@ -581,6 +859,53 @@ html.eink .switch.on { background: #000000; }
 html.eink .switch.on .knob { background: #FFFFFF; left: 1.72rem; }
 html.eink .btn-line.danger { border-color: #000000; color: #000000; border-width: 0.25rem; }
 
+
+html.eink .avatar { background: #FFFFFF !important; color: #000000 !important; border: 0.15rem solid #000000; }
+html.eink .avatar.big { border-width: 0.25rem; }
+html.eink .player-chip, html.eink .chip-days, html.eink .who-card, html.eink .np-card, html.eink .record,
+html.eink .medal-card, html.eink .sprint-card, html.eink .lvl.sum-lvl { background: #FFFFFF; border-color: #000000; color: #000000; }
+html.eink .player-chip .icon, html.eink .chip-days .icon, html.eink .rec-n .icon, html.eink .who-stars .icon,
+html.eink .combo .icon, html.eink .sprint-stars .icon { color: #000000; }
+html.eink .screen.who, html.eink .screen.newplayer { background: #FFFFFF; }
+html.eink .who-card.cur { border-width: 0.3rem; }
+html.eink .home-lvl { background: #FFFFFF; border: 0.13rem solid #000000; }
+html.eink .lvl-n { background: #000000; border-color: #000000; }
+html.eink .lvl-bar, html.eink .sprint-track { background: #FFFFFF; border: 0.12rem solid #000000; }
+html.eink .lvl-fill, html.eink .sprint-fill { background: #000000; }
+html.eink .lvl-need, html.eink .who-lvl, html.eink .rec-l, html.eink .mc-text { color: #000000; }
+html.eink .swatch { border-color: #FFFFFF; box-shadow: 0 0 0 0.13rem #000000; }
+html.eink .swatch.on { box-shadow: 0 0 0 0.3rem #000000; }
+html.eink .climb-hill { fill: #E8E8E8; }
+html.eink .climb-line { stroke: #000000; stroke-width: 1.5; }
+html.eink .climb-stop { fill: #FFFFFF; stroke: #000000; }
+html.eink .climb-stop.on { fill: #000000; }
+html.eink .climb-stop.now { stroke-width: 2.8; }
+html.eink .climb-pole { stroke: #000000; }
+html.eink .combo.on { background: #FFFFFF; border-color: #000000; }
+html.eink .fb-bonus { color: #000000; }
+html.eink .sum-levelup { background: #000000; color: #FFFFFF; }
+html.eink .ribbon-a, html.eink .ribbon-b { fill: #000000; }
+html.eink .disc { fill: #000000; }
+html.eink .disc-in { fill: #000000; }
+html.eink .micon { color: #FFFFFF; }
+html.eink .micon .hole { fill: #000000; }
+html.eink .medal.locked .ribbon-a, html.eink .medal.locked .ribbon-b { fill: #FFFFFF; stroke: #9A9A9A; stroke-width: 1; }
+html.eink .medal.locked .disc { fill: #FFFFFF; stroke: #9A9A9A; stroke-width: 1.2; stroke-dasharray: 3 3; }
+html.eink .medal.locked .disc-in { fill: #FFFFFF; }
+html.eink .medal.locked .micon { color: #9A9A9A; }
+html.eink .medal.locked .micon .hole { fill: #FFFFFF; }
+html.eink .medal-card.won { border-width: 0.25rem; }
+html.eink .medal-card:not(.won) .mc-title { color: #000000; }
+html.eink .sprint-hill { fill: #E8E8E8; }
+html.eink .sprint-path { stroke: #000000; stroke-width: 2.5; }
+html.eink .hut-wall { fill: #FFFFFF; stroke: #000000; stroke-width: 2; }
+html.eink .hut-roof, html.eink .hut-door { fill: #000000; }
+html.eink .sprint-record.rec, html.eink .sprint-fb { color: #000000; }
+html.eink .btn-tile .icon-hut .hole { fill: #FFFFFF; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+@media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
+html.eink .micon.icon-flag .fill { fill: #FFFFFF; }
+html.eink .medal.locked .micon.icon-flag .fill { fill: #9A9A9A; }
