@@ -3,6 +3,13 @@
 
     <!-- Geen internettoegang nodig: alles zit in de app. -->
 
+    <!-- Nodig vanaf Android 11 om de spraakmotor te vinden (Mo leest voor). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

@@ -744,6 +744,288 @@ button:focus-visible { outline: 0.2rem solid #2F6FD0; outline-offset: 0.15rem; }
 .set-head .avatar { margin-right: 0.6rem; }
 .set-col .set-head + .set-row { margin-top: 0; }
 
+
+/* ---------- tempo */
+.tempo { display: flex; align-items: center; justify-content: center; height: 1.6rem; margin: 0.1rem auto 0.2rem; width: 70%; max-width: 22rem; visibility: hidden; }
+.tempo.on { visibility: visible; }
+.tempo .icon { width: 1.4rem; height: 1.4rem; color: #E4AC00; margin-right: 0.4rem; flex: 0 0 auto; }
+.tempo-track { flex: 1 1 auto; height: 0.75rem; border-radius: 0.4rem; background: #DCE6EF; overflow: hidden; }
+.tempo-fill { height: 100%; width: 100%; background: #F2B705; border-radius: 0.4rem; }
+.tempo.hit .tempo-fill { background: #2D7A4D; }
+.tempo.late .icon { color: #A9B7C6; }
+.fb-time { font-family: 'Fredoka', sans-serif; font-weight: 500; font-size: 1.2rem; color: #3E4C6B; margin-top: 0.3rem; }
+.intro-go { margin-top: 0.5rem; min-width: 14rem; }
+.sum-levelup.unlock { display: flex; align-items: center; background: #1F2A44; color: #FFFFFF; }
+.sum-levelup.unlock .icon { width: 1.6rem; height: 1.6rem; margin-right: 0.5rem; color: #FFFFFF; }
+
+/* tafels die nog niet aan de beurt zijn */
+.peak-off { opacity: 0.42; }
+.badge-off { fill: #EEF3F7; }
+
+/* ---------- voortgang voor ouders */
+.progress { margin-bottom: 0.6rem; }
+.pace-line { font-size: 1.05rem; }
+.pace-tag { display: inline-block; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.15rem; background: #EEF5FB; border-radius: 0.6rem; padding: 0.05rem 0.6rem; }
+.spark-wrap { margin: 0.5rem 0 0.7rem; max-width: 30rem; }
+.spark-title { display: block; font-weight: 700; font-size: 0.95rem; }
+.spark { display: block; width: 100%; height: auto; margin: 0.2rem 0; }
+.spark-base { stroke: #D9E4EE; stroke-width: 1; }
+.spark-target { stroke: #8EA3C4; stroke-width: 1.2; stroke-dasharray: 4 4; }
+.spark-line { fill: none; stroke: #4C5D82; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark-dot { fill: #4C5D82; stroke: #FFFFFF; stroke-width: 1.5; }
+.spark-dot.last { fill: #1F2A44; }
+.spark-note { display: block; font-size: 0.88rem; color: #3E4C6B; }
+.parents-h2 { margin-top: 0.8rem; }
+.seg-wide { margin-top: 0.45rem; display: flex; width: 100%; }
+.seg-wide .seg-btn { flex: 1 1 0; font-size: 1.05rem; padding: 0.4rem 0.3rem; }
+
+
+/* ---------- Mo de marmot */
+.mo { display: block; overflow: visible; }
+.mo-fur { fill: #B9824A; }
+.mo-light { fill: #EED8B8; }
+.mo-dark { fill: #3B2618; }
+.mo-dark.soft { fill: #8A5A33; }
+.mo-white { fill: #FFFFFF; }
+.mo-cheek { fill: #F29C9C; opacity: 0.65; }
+.mo-mouth { fill: #7A2E2E; }
+.mo-line { stroke: #5A3A22; stroke-width: 2; stroke-linejoin: round; }
+.mo-stroke { fill: none; stroke: #3B2618; stroke-width: 3; stroke-linecap: round; }
+.mo-stroke.thin { stroke-width: 2.2; }
+.mo-tooth { stroke: #5A3A22; stroke-width: 0.8; }
+.mo .it { stroke: #1F2A44; stroke-width: 1.6; stroke-linejoin: round; }
+.mo .it-dark { fill: #1F2A44; }
+.mo .it-line { fill: none; stroke-width: 3.2; stroke-linecap: round; }
+.mo .it-line.thin { stroke-width: 1.6; }
+
+.mo-say { display: flex; align-items: center; }
+.mo-fig { flex: 0 0 auto; display: block; width: 5.6rem; }
+.mo-fig .mo { width: 100%; height: auto; }
+button.mo-fig { padding: 0; }
+.bubble {
+  position: relative;
+  display: block;
+  text-align: left;
+  background: #FFFFFF;
+  border: 0.15rem solid #C9D8E6;
+  border-radius: 1.2rem;
+  padding: 0.55rem 0.9rem 0.6rem;
+  font-family: 'Andika', sans-serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: #1F2A44;
+  margin-left: 0.8rem;
+  max-width: 24rem;
+}
+.bubble:before {
+  content: '';
+  position: absolute;
+  left: -0.75rem;
+  top: 50%;
+  margin-top: -0.6rem;
+  border-style: solid;
+  border-width: 0.6rem 0.75rem 0.6rem 0;
+  border-color: transparent #C9D8E6 transparent transparent;
+}
+.bubble:after {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  margin-top: -0.45rem;
+  border-style: solid;
+  border-width: 0.45rem 0.55rem 0.45rem 0;
+  border-color: transparent #FFFFFF transparent transparent;
+}
+.mo-say > .bubble:first-child { margin-left: 0; margin-right: 0.8rem; }
+.mo-say > .bubble:first-child:before { left: auto; right: -0.75rem; border-width: 0.6rem 0 0.6rem 0.75rem; border-color: transparent transparent transparent #C9D8E6; }
+.mo-say > .bubble:first-child:after { left: auto; right: -0.5rem; border-width: 0.45rem 0 0.45rem 0.55rem; border-color: transparent transparent transparent #FFFFFF; }
+.bubble.solo { margin: 0.6rem auto 0; }
+.bubble.solo:before, .bubble.solo:after { display: none; }
+
+/* ---------- startscherm: Mo en het dagdoel */
+.hello-cards { display: flex; align-items: stretch; margin-top: 0.7rem; }
+.hello-cards .home-lvl { margin-top: 0; }
+.goal {
+  display: flex;
+  align-items: center;
+  margin-left: 0.6rem;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 1.4rem 1rem 1rem 1.4rem;
+  padding: 0.35rem 0.9rem 0.35rem 0.35rem;
+}
+.goal-ringbox { position: relative; width: 3.2rem; height: 3.2rem; flex: 0 0 auto; margin-right: 0.55rem; }
+.goal-ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.gr-bg { fill: #FFFFFF; stroke: #D3E0EC; stroke-width: 5; }
+.gr-fg { fill: none; stroke: #F2B705; stroke-width: 5; stroke-linecap: round; }
+.goal.hit .gr-fg { stroke: #2D7A4D; }
+.goal-mid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.goal-mid .icon { width: 1.35rem; height: 1.35rem; color: #E4AC00; }
+.goal.hit .goal-mid .icon { color: #2D7A4D; }
+.goal-body { display: flex; flex-direction: column; }
+.goal-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.35rem; line-height: 1.1; }
+.goal-n { font-size: 0.95rem; color: #33415F; margin-top: 0.15rem; white-space: nowrap; }
+.home-mo { position: absolute; right: 1.4rem; top: 7.6rem; z-index: 2; }
+html.land .hello-cards { flex-direction: column; align-items: flex-start; }
+html.land .hello-cards .goal { margin: 0.5rem 0 0; width: 20rem; }
+.home-mo .mo-fig { width: 6.6rem; }
+.home-mo .bubble { max-width: 19rem; }
+.chip-days.zero .icon { color: #A9B7C6; }
+.btn-speed .icon { color: #E4AC00; }
+.btn-time { display: block; font-family: 'Andika', sans-serif; font-weight: 700; font-size: 0.95rem; margin-left: 0.5rem; color: #3E4C6B; }
+.pennant.gold { fill: #F2B705; stroke: #B98C00; stroke-width: 0.8; }
+.badge.ring { stroke-width: 3; }
+.badge.ring.m1 { stroke: #C77B30; }
+.badge.ring.m2 { stroke: #8E9BAD; }
+.badge.ring.m3 { stroke: #E4AC00; }
+
+/* ---------- Mo tijdens een ronde en op eindschermen */
+.fb-tags { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem; }
+.tag { display: inline-flex; align-items: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.15rem; border-radius: 2rem; padding: 0.2rem 0.75rem 0.2rem 0.45rem; margin: 0.2rem; background: #FFFFFF; border: 0.13rem solid #D9E4EE; }
+.tag .icon { width: 1.25rem; height: 1.25rem; margin-right: 0.3rem; }
+.tag-star .icon { color: #F2B705; }
+.tag-bolt { background: #FFF2CF; border-color: #EBD48F; }
+.tag-bolt .icon { color: #B98C00; }
+.tag-rec { background: #E3F2E8; border-color: #9FD0AF; }
+.tag-rec .icon { color: #2D7A4D; }
+.tag-time { padding-left: 0.75rem; color: #3E4C6B; }
+.tag-combo .icon { color: #5D6F93; }
+.fb-mo { margin-top: 0.6rem; }
+.fb-mo .mo-fig { width: 4.2rem; }
+.fb-mo .bubble { font-size: 1.05rem; }
+.combo.boltrun { background: #F2B705; border-color: #B98C00; }
+.combo.boltrun .icon { color: #1F2A44; }
+.combo small { font-size: 0.95rem; margin-left: 0.3rem; }
+.sum-head { display: flex; align-items: center; justify-content: center; margin-bottom: 0.7rem; text-align: left; }
+.sum-head .mo-fig { width: 6rem; margin-right: 0.9rem; }
+.sum-headtext { display: flex; flex-direction: column; align-items: flex-start; }
+.summary .sum-headtext h1 { margin: 0 0 0.35rem 0.2rem; }
+.sum-headtext .bubble { margin-left: 0; max-width: 28rem; }
+.sum-headtext .bubble:before { left: 1.4rem; top: -0.75rem; margin-top: 0; border-width: 0 0.6rem 0.75rem 0.6rem; border-color: transparent transparent #C9D8E6 transparent; }
+.sum-headtext .bubble:after { left: 1.55rem; top: -0.5rem; margin-top: 0; border-width: 0 0.45rem 0.55rem 0.45rem; border-color: transparent transparent #FFFFFF transparent; }
+html.land .sum-stats { flex-wrap: nowrap; }
+html.land .sum-stat { min-width: 0; flex: 1 1 0; max-width: 13rem; padding: 0.5rem 0.6rem 0.6rem; }
+.sum-n { white-space: nowrap; }
+html.land .summary .sum-n { font-size: 1.85rem; }
+html.land .summary .sum-l { font-size: 0.92rem; }
+.summary .lvl.sum-lvl { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.summary .sum-levelup { margin-bottom: 0.4rem; }
+.card-mo { margin: 0.3rem 0 0.4rem; text-align: left; }
+.card-mo .mo-fig { width: 5rem; }
+.chip-rec .icon { width: 1.2rem; height: 1.2rem; color: #2D7A4D; margin-right: 0.3rem; vertical-align: -0.15rem; display: inline-block; }
+.chip-rec { display: inline-flex; align-items: center; }
+.btn-wide { min-width: 16rem; }
+
+/* ---------- feestjes */
+.screen.celebrate { background: #C4E0F3; background: linear-gradient(to bottom, #B8D9F0 0%, #EAF4FA 100%); }
+.cel-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow-y: auto; }
+.cel-body { display: flex; flex-direction: column; align-items: center; margin: 0.6rem 0 0.4rem; }
+.cel-body h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem; line-height: 1.1; margin: 0.3rem 0 0.6rem; }
+.cel-sub { display: flex; align-items: center; justify-content: center; font-size: 1.25rem; max-width: 30rem; }
+.cel-sub .icon { width: 1.5rem; height: 1.5rem; color: #F2B705; margin-right: 0.35rem; }
+.cel-note { display: flex; align-items: center; justify-content: center; font-size: 1.05rem; color: #33415F; margin-top: 0.7rem; max-width: 34rem; }
+.cel-note .icon { width: 1.4rem; height: 1.4rem; margin-right: 0.4rem; color: #B86B3E; flex: 0 0 auto; }
+.cel-note.small { font-size: 0.95rem; margin-top: 0.3rem; }
+.cel-mo .mo-fig { width: 6.5rem; }
+.cel-mo.big .mo-fig { width: 9rem; }
+.cel-actions { margin-top: 0.8rem; min-height: 4.4rem; }
+.cel-flag .icon { width: 5rem; height: 5rem; color: #1F2A44; }
+.cel-flag .flagcloth { fill: #F2B705; }
+.bigsun { width: 8rem; height: 8rem; }
+.bigsun .ray { fill: #F7C83A; }
+.bigsun .core { fill: #F2B705; stroke: #FFFFFF; stroke-width: 3; }
+.bigsun .core-n { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 36px; fill: #1F2A44; }
+.week { display: flex; justify-content: center; }
+.wd { display: flex; flex-direction: column; align-items: center; margin: 0 0.3rem; }
+.wd-dot { width: 2.8rem; height: 2.8rem; border-radius: 50%; background: #FFFFFF; border: 0.15rem solid #C9D8E6; display: flex; align-items: center; justify-content: center; }
+.wd-dot .icon { width: 1.7rem; height: 1.7rem; }
+.wd.on .wd-dot { background: #F2B705; border-color: #B98C00; }
+.wd.on .wd-dot .icon { color: #1F2A44; }
+.wd.hut .wd-dot { background: #F3E3D6; border-color: #B86B3E; }
+.wd.hut .wd-dot .icon { color: #B86B3E; }
+.wd.today .wd-dot { box-shadow: 0 0 0 0.2rem #1F2A44; }
+.wd.future .wd-dot { opacity: 0.5; }
+.wd-name { font-size: 1rem; margin-top: 0.3rem; font-weight: 700; }
+.chest-btn { display: block; margin: 0.4rem auto 0; }
+.chest { width: 11rem; height: 9.5rem; display: block; }
+.chest .box { fill: #B86B3E; stroke: #6A3A1F; stroke-width: 2.5; }
+.chest .lid { fill: #C97C4A; stroke: #6A3A1F; stroke-width: 2.5; stroke-linejoin: round; }
+.chest .band { fill: #E4AC00; }
+.chest .lock { fill: #F7C83A; stroke: #6A3A1F; stroke-width: 2; }
+.chest .glow { fill: #F7C83A; opacity: 0.85; }
+.chest .lid-in { fill: #8F4E26; stroke: #6A3A1F; stroke-width: 2.5; stroke-linejoin: round; }
+.chest .inside { fill: #4A2512; }
+.reward { min-height: 3rem; display: flex; align-items: center; justify-content: center; }
+.reward-hint { font-size: 1.15rem; font-weight: 700; color: #33415F; }
+.reward-got { display: flex; align-items: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.6rem; }
+.reward-got .icon { width: 2rem; height: 2rem; margin-right: 0.45rem; color: #F2B705; }
+
+/* ---------- de kast van Mo */
+.kast-main { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; }
+.kast-left { flex: 0 0 38%; display: flex; flex-direction: column; align-items: center; }
+.kast-mo .kast-big { width: 14rem; height: auto; }
+.kast-grid { flex: 1 1 auto; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; }
+.kast-item { width: 30%; margin: 0.3rem 1.5%; background: #FFFFFF; border: 0.13rem solid #D9E4EE; border-bottom-width: 0.3rem; border-radius: 1.1rem; padding: 0.3rem 0.3rem 0.5rem; display: flex; flex-direction: column; align-items: center; }
+.kast-item.on { border-color: #F2B705; background: #FFF8DC; }
+.kast-item.locked { opacity: 0.55; }
+.kast-item.locked .kast-mini { opacity: 0.5; }
+.kast-mini { width: 4.6rem; height: auto; }
+.ki-name { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.1rem; margin-top: 0.15rem; }
+.ki-state { font-size: 0.9rem; color: #3E4C6B; }
+
+/* ---------- snelheid en races */
+.speed-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 0.3rem 0; }
+.speed-mo { margin-bottom: 0.6rem; }
+.speed-mo .mo-fig { width: 5rem; }
+.speed-sprint {
+  display: flex; align-items: center; width: 40rem; max-width: 100%;
+  background: #FFFFFF; border: 0.13rem solid #C9D8E6; border-bottom-width: 0.35rem; border-radius: 1.3rem;
+  padding: 0.8rem 1.2rem; text-align: left;
+}
+.speed-sprint > .icon { width: 3rem; height: 3rem; color: #B86B3E; flex: 0 0 auto; margin-right: 0.9rem; }
+.ss-text { flex: 1 1 auto; display: flex; flex-direction: column; }
+.ss-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.6rem; }
+.ss-sub { font-size: 1rem; color: #3E4C6B; }
+.ss-rec { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2rem; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.ss-rec small { font-family: 'Andika', sans-serif; font-weight: 400; font-size: 0.85rem; color: #3E4C6B; }
+.speed-h2 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.5rem; margin: 1rem 0 0.4rem; }
+.race-grid { display: flex; flex-wrap: wrap; justify-content: center; width: 46rem; max-width: 100%; }
+.race-card {
+  width: 18%; margin: 0.3rem 1%; background: #FFFFFF; border: 0.13rem solid #C9D8E6; border-bottom-width: 0.35rem;
+  border-radius: 1.1rem; padding: 0.4rem 0.3rem 0.5rem; display: flex; flex-direction: column; align-items: center;
+}
+.race-card.gold { border-color: #E4AC00; background: #FFF8DC; }
+.race-card.locked { opacity: 0.55; }
+.rc-t { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2rem; line-height: 1.1; }
+.rc-medal { width: 2.6rem; height: 3rem; }
+.rc-time { font-size: 0.92rem; color: #3E4C6B; margin-top: 0.1rem; }
+.rmedal .ribbon-a { fill: #D33F49; }
+.rmedal .ribbon-b { fill: #2F6FD0; }
+.rmedal.m0 .ribbon-a, .rmedal.m0 .ribbon-b { fill: #D3DCE5; }
+.rmedal.m0 .disc { fill: #D9E2EB; }
+.rmedal.m0 .disc-in { fill: #EEF3F7; }
+.rmedal.m0 .bolt { fill: #A9B7C6; }
+.rmedal.m1 .disc { fill: #A8622A; }
+.rmedal.m1 .disc-in { fill: #D89058; }
+.rmedal.m2 .disc { fill: #8E9BAD; }
+.rmedal.m2 .disc-in { fill: #CBD4DE; }
+.rmedal.m3 .disc { fill: #E4AC00; }
+.rmedal.m3 .disc-in { fill: #F7C83A; }
+.rmedal .bolt { fill: #1F2A44; }
+.race-main { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+.race-rec { display: flex; align-items: center; justify-content: center; margin: 0.4rem 0; text-align: left; }
+.race-rec-medal { width: 3.6rem; height: 4.2rem; margin-right: 0.9rem; }
+.race-rec-medal.big { width: 5rem; height: 5.8rem; }
+.race-next { font-size: 1.05rem; color: #3E4C6B; margin-top: 0.1rem !important; }
+.countdown { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 9rem; text-align: center; line-height: 1; }
+.race-top { display: flex; align-items: center; margin-top: 0.3rem; }
+.race-track { flex: 1 1 auto; min-width: 0; height: 5.2rem; position: relative; }
+.track { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.race-clock { flex: 0 0 auto; min-width: 6.5rem; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.2rem; }
+.ghost { fill: #8EA3C4; opacity: 0.55; stroke: #FFFFFF; stroke-width: 1.6; }
+.ghost.off { display: none; }
+
 /* ---------- staand (Boox, tablet rechtop) */
 html.port .hello h1 { font-size: 2.7rem; }
 html.port .sun { right: 2rem; width: 5rem; height: 5rem; }
@@ -787,6 +1069,25 @@ html.port .sum-stat { min-width: 0; width: 23%; margin: 0.25rem 1%; padding: 0.4
 html.port .sum-n { font-size: 1.7rem; }
 html.port .sum-l { font-size: 0.88rem; }
 html.port .np-card { padding: 1rem 1.1rem 1.2rem; }
+
+
+html.port .home-mo { position: relative; right: auto; top: auto; margin: 0.5rem 1.2rem 0; z-index: 2; }
+html.port .home-mo .mo-fig { width: 4.6rem; }
+html.port .home-mo .bubble { font-size: 1.05rem; max-width: none; }
+html.port .hello { position: relative; left: auto; top: auto; max-width: none; padding: 0.6rem 1.2rem 0; }
+html.port .range { justify-content: flex-start; }
+html.port .peaks { margin-top: auto; }
+html.port .sun { display: none; }
+html.port .goal-n { font-size: 0.88rem; }
+html.port .kast-main { flex-direction: column; }
+html.port .kast-left { flex: 0 0 auto; }
+html.port .kast-mo .kast-big { width: 10rem; }
+html.port .race-card { width: 18%; margin: 0.25rem 1%; }
+html.port .rc-t { font-size: 1.6rem; }
+html.port .rc-time { font-size: 0.8rem; }
+html.port .wd { margin: 0 0.18rem; }
+html.port .wd-dot { width: 2.5rem; height: 2.5rem; }
+html.port .fb-mo .mo-fig { width: 3.6rem; }
 
 /* ---------- e-ink: zwart op wit, geen beweging, geen verlopen */
 html.eink, html.eink body { background: #FFFFFF; color: #000000; }
@@ -903,9 +1204,83 @@ html.eink .hut-roof, html.eink .hut-door { fill: #000000; }
 html.eink .sprint-record.rec, html.eink .sprint-fb { color: #000000; }
 html.eink .btn-tile .icon-hut .hole { fill: #FFFFFF; }
 
+
+html.eink .peak-off { opacity: 0.35; }
+html.eink .badge-off { fill: #FFFFFF; }
+html.eink .fb-time, html.eink .spark-note { color: #000000; }
+html.eink .sum-levelup.unlock { background: #000000; }
+html.eink .pace-tag { background: #FFFFFF; border: 0.12rem solid #000000; }
+html.eink .spark-base { stroke: #9A9A9A; }
+html.eink .spark-target { stroke: #000000; }
+html.eink .spark-line { stroke: #000000; }
+html.eink .spark-dot { fill: #000000; }
+
+
+html.eink .mo-fur { fill: #C9C9C9; }
+html.eink .mo-light { fill: #FFFFFF; }
+html.eink .mo-dark { fill: #000000; }
+html.eink .mo-dark.soft { fill: #777777; }
+html.eink .mo-cheek { display: none; }
+html.eink .mo-mouth { fill: #000000; }
+html.eink .mo-line { stroke: #000000; stroke-width: 2.4; }
+html.eink .mo-stroke, html.eink .mo-tooth { stroke: #000000; }
+html.eink .mo .it { fill: #FFFFFF; stroke: #000000; stroke-width: 2; }
+html.eink .mo .it-dark { fill: #000000; }
+html.eink .mo .it-line { stroke: #000000; }
+html.eink .bubble { border-color: #000000; color: #000000; }
+html.eink .bubble:before { border-right-color: #000000; }
+html.eink .sum-headtext .bubble:before { border-right-color: transparent; border-bottom-color: #000000; }
+html.eink .chest .lid-in { fill: #BDBDBD; stroke: #000000; }
+html.eink .chest .inside { fill: #000000; }
+html.eink .mo-say > .bubble:first-child:before { border-right-color: transparent; border-left-color: #000000; }
+html.eink .goal, html.eink .tag, html.eink .speed-sprint, html.eink .race-card, html.eink .kast-item, html.eink .wd-dot { background: #FFFFFF; border-color: #000000; color: #000000; }
+html.eink .gr-bg { stroke: #BDBDBD; }
+html.eink .gr-fg, html.eink .goal.hit .gr-fg { stroke: #000000; }
+html.eink .goal-mid .icon, html.eink .goal.hit .goal-mid .icon, html.eink .tag .icon, html.eink .btn-speed .icon, html.eink .chip-rec .icon,
+html.eink .cel-sub .icon, html.eink .cel-note .icon, html.eink .speed-sprint > .icon, html.eink .reward-got .icon, html.eink .chip-days.zero .icon { color: #000000; }
+html.eink .goal-n, html.eink .cel-note, html.eink .ss-sub, html.eink .ss-rec small, html.eink .rc-time, html.eink .ki-state, html.eink .race-next, html.eink .reward-hint, html.eink .btn-time, html.eink .tag-time { color: #000000; }
+html.eink .tag-bolt, html.eink .tag-rec { border-width: 0.2rem; }
+html.eink .combo.boltrun { background: #000000; color: #FFFFFF; border-color: #000000; }
+html.eink .combo.boltrun .icon { color: #FFFFFF; }
+html.eink .pennant.gold { fill: #FFFFFF; stroke: #000000; stroke-width: 1.4; }
+html.eink .badge.ring { stroke: #000000; }
+html.eink .badge.ring.m3 { stroke-width: 4.5; }
+html.eink .screen.celebrate { background: #FFFFFF; }
+html.eink .bigsun .ray { fill: #000000; }
+html.eink .bigsun .core { fill: #FFFFFF; stroke: #000000; }
+html.eink .bigsun .core-n { fill: #000000; }
+html.eink .wd.on .wd-dot { background: #000000; }
+html.eink .wd.on .wd-dot .icon { color: #FFFFFF; }
+html.eink .wd.hut .wd-dot { background: #FFFFFF; border-style: dashed; }
+html.eink .wd.hut .wd-dot .icon { color: #000000; }
+html.eink .chest .box, html.eink .chest .lid { fill: #FFFFFF; stroke: #000000; }
+html.eink .chest .band { fill: #000000; }
+html.eink .chest .lock { fill: #FFFFFF; stroke: #000000; }
+html.eink .chest .glow { fill: #BDBDBD; }
+html.eink .cel-flag .flagcloth { fill: #FFFFFF; stroke: #000000; stroke-width: 1.5; }
+html.eink .kast-item.on { background: #FFFFFF; border-width: 0.3rem; }
+html.eink .race-card.gold { background: #FFFFFF; border-width: 0.3rem; }
+html.eink .rmedal .ribbon-a, html.eink .rmedal .ribbon-b { fill: #000000; }
+html.eink .rmedal .disc { fill: #000000; }
+html.eink .rmedal .disc-in { fill: #FFFFFF; }
+html.eink .rmedal.m1 .disc-in { fill: #E0E0E0; }
+html.eink .rmedal.m2 .disc-in { fill: #BDBDBD; }
+html.eink .rmedal.m3 .disc-in { fill: #FFFFFF; }
+html.eink .rmedal .bolt { fill: #000000; }
+html.eink .rmedal.m0 .ribbon-a, html.eink .rmedal.m0 .ribbon-b, html.eink .rmedal.m0 .disc { fill: #FFFFFF; stroke: #9A9A9A; stroke-width: 1.2; }
+html.eink .rmedal.m0 .bolt { fill: #9A9A9A; }
+html.eink .ghost { fill: #FFFFFF; stroke: #000000; stroke-width: 2; stroke-dasharray: 3 2; opacity: 1; }
+html.eink .tempo .icon { color: #000000; }
+html.eink .tempo-track { background: #FFFFFF; border: 0.12rem solid #000000; }
+html.eink .tempo-fill, html.eink .tempo.hit .tempo-fill { background: #000000; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
 html.eink .micon.icon-flag .fill { fill: #FFFFFF; }
 html.eink .medal.locked .micon.icon-flag .fill { fill: #9A9A9A; }
+.sum-foot { flex: 0 0 auto; display: flex; justify-content: center; padding-top: 0.4rem; }
+.sum-foot .sum-actions { margin-top: 0; }
+.summary .sum-n { font-size: 1.6rem; }
+.summary .sum-stat { padding-left: 0.3rem; padding-right: 0.3rem; }

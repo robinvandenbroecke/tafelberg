@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
@@ -24,6 +25,8 @@ public class MainActivity extends Activity {
 
     private static final String START = "file:///android_asset/www/index.html";
     private WebView web;
+    private TextToSpeech tts;
+    private volatile boolean ttsReady = false;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -62,6 +65,8 @@ public class MainActivity extends Activity {
         });
 
         web.addJavascriptInterface(new Store(getSharedPreferences("tafelberg", MODE_PRIVATE)), "AndroidStore");
+        startSpeech();
+        web.addJavascriptInterface(new Speech(), "AndroidSpeech");
         web.setWebViewClient(new WebViewClient() {
             @SuppressWarnings("deprecation")
             @Override
@@ -72,6 +77,26 @@ public class MainActivity extends Activity {
         });
 
         web.loadUrl(eink ? START + "?eink=1" : START);
+    }
+
+    /** Spraak voor Mo: Vlaams als dat kan, anders Nederlands, anders zwijgt Mo. */
+    private void startSpeech() {
+        try {
+            tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+                @Override
+                public void onInit(int status) {
+                    if (status != TextToSpeech.SUCCESS || tts == null) return;
+                    int r = tts.setLanguage(new Locale("nl", "BE"));
+                    if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        r = tts.setLanguage(new Locale("nl", "NL"));
+                    }
+                    ttsReady = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED;
+                    if (ttsReady) tts.setSpeechRate(0.95f);
+                }
+            });
+        } catch (RuntimeException e) {
+            tts = null;
+        }
     }
 
     private static boolean isEinkDevice() {
@@ -116,6 +141,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (tts != null) tts.stop();
         if (web != null) web.onPause();
         super.onPause();
     }
@@ -128,11 +154,45 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (tts != null) {
+            tts.shutdown();
+            tts = null;
+        }
         if (web != null) {
             web.destroy();
             web = null;
         }
         super.onDestroy();
+    }
+
+    /** Laat het spel Mo's zinnen voorlezen. Oproepen komen van een andere thread. */
+    final class Speech {
+        @JavascriptInterface
+        public void speak(final String text) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (tts != null && ttsReady && text != null) {
+                        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mo");
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (tts != null) tts.stop();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean ready() {
+            return ttsReady;
+        }
     }
 
     /** Bewaart de voortgang ook buiten de WebView, in de gewone app-instellingen. */
