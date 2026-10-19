@@ -389,7 +389,7 @@ button:focus-visible { outline: 0.2rem solid #2F6FD0; outline-offset: 0.15rem; }
 .sum-flag .icon { width: 4.2rem; height: 4.2rem; color: #4F6086; }
 .sum-flag.big .icon { width: 6rem; height: 6rem; color: #1F2A44; }
 .summary h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.6rem; line-height: 1.1; margin: 0.1rem 0 0.7rem; max-width: 34rem; }
-.sum-stats { display: flex; justify-content: center; flex-wrap: wrap; }
+.sum-stats { display: flex; justify-content: center; flex-wrap: wrap; width: 100%; max-width: 46rem; }
 .sum-stat { background: #FFFFFF; border-radius: 1.2rem; border: 0.13rem solid #D9E4EE; padding: 0.6rem 1.2rem 0.7rem; margin: 0.3rem; min-width: 9.5rem; }
 .sum-n { display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 2.1rem; line-height: 1.1; }
 .sum-n .icon { width: 1.9rem; height: 1.9rem; color: #F2B705; margin-right: 0.25rem; }
