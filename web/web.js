@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   if (window.AndroidStore || !/^https?:$/.test(location.protocol)) return;
+  var watchedReg = null;
   var api = null, waiting = null, updating = false, lastScreen = '', hiddenToday = false;
   var entries = [], cursor = 0, popping = false, expectedPop = false;
   var android = /Android/i.test(navigator.userAgent);
@@ -42,6 +43,8 @@
     }
   }
   function watch(reg) {
+    if (!reg || watchedReg === reg) return;
+    watchedReg = reg;
     if (reg.waiting && navigator.serviceWorker.controller) { waiting = reg.waiting; banner(); }
     reg.addEventListener('updatefound', function () {
       var worker = reg.installing;
@@ -62,6 +65,10 @@
           // Ook in andere open vensters nooit een ronde onderbreken.
           if (updating && lastScreen === 'home') location.reload();
         }, false);
+        // Ook offline moet een bestaande registratie latere updates kunnen melden.
+        if (navigator.serviceWorker.getRegistration) {
+          navigator.serviceWorker.getRegistration().then(watch, function () {});
+        }
         navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' }).then(watch, function () {});
       }
     },

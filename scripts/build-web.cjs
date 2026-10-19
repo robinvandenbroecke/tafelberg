@@ -18,7 +18,7 @@ const base = process.env.TB_SITE_URL || `https://${repo.split('/')[0]}.github.io
     const width = Math.round(size * fraction);
     const image = await sharp(fg).resize(width,width,{fit:'contain'}).png().toBuffer();
     await sharp({create:{width:size,height:size,channels:3,background:'#BBDDF3'}})
-      .composite([{input:image,gravity:'centre'}]).png().toFile(path.join(out,'icons',name+'.png'));
+      .composite([{input:image,gravity:'centre'}]).flatten({background:'#BBDDF3'}).removeAlpha().png().toFile(path.join(out,'icons',name+'.png'));
   }
   fs.writeFileSync(path.join(out,'installeer/qr.svg'), await QR.toString(base+'installeer/',{type:'svg',margin:2,color:{dark:'#1F2A44',light:'#FFFFFF'}}));
   // Een optionele catalogus. Geen 404 in repositories zonder opgenomen stemmen.

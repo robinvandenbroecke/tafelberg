@@ -42,8 +42,8 @@ async function metrics(page){return page.evaluate(()=>{
  return {over,small,pad:badPad?{top:r.top,bottom:r.bottom,h}:null,off};
 });}
 async function matrix(browser,type,base){
- for(const [device,w,h] of sizes){const context=await browser.newContext({viewport:{width:w,height:h},hasTouch:true,deviceScaleFactor:1});const page=await context.newPage();
- page.on('pageerror',e=>errors.push({type,device,message:e.message}));
+ for(const [device,w,h] of sizes.filter(v=>!process.env.TB_TEST_DEVICE||v[0]===process.env.TB_TEST_DEVICE)){const context=await browser.newContext({viewport:{width:w,height:h},hasTouch:true,deviceScaleFactor:1});const page=await context.newPage();
+ page.on('pageerror',e=>errors.push({type,device,message:e.message}));page.on('console',m=>{if(m.type()==='error')errors.push({type,device,message:m.text()});});
  await page.goto(base+(device==='boox'?'?eink=1':''));await seed(page);
  for(const name of screens){await visit(page,name);const m=await metrics(page);results.push({type,device,name,...m});if(m.over||m.pad||m.small.length||m.off.length)failures.push({type,device,name,...m});
  await page.screenshot({path:`test-results/screens/${type}-${device}-${name}.png`});
@@ -51,6 +51,38 @@ async function matrix(browser,type,base){
  }
  await context.close();
  }
+}
+async function safeAreas(browser,type,base){
+ for(const side of ['left','right']){
+  const c=await browser.newContext({viewport:{width:852,height:393},hasTouch:true});
+  await c.route('**/css/style.css',route=>{
+   let css=fs.readFileSync('_site/css/style.css','utf8').replace(/env\(safe-area-inset-(top|right|bottom|left)\)/g,(_,edge)=>edge==='bottom'?'21px':edge===side?'44px':'0px');
+   route.fulfill({contentType:'text/css',body:css});
+  });
+  const p=await c.newPage();await p.goto(base);await seed(p);
+  for(const name of ['home','practice','ladder','race','sprint']){await visit(p,name);const m=await metrics(p);results.push({type,device:'notch-'+side,name,...m});if(m.pad||m.over||m.off.length)failures.push({type,device:'notch-'+side,name,...m});await p.screenshot({path:`test-results/screens/${type}-notch-${side}-${name}.png`});}
+  await c.close();
+ }
+}
+async function voiceAndCopies(browser,base){
+ const c=await browser.newContext({viewport:{width:393,height:852}});
+ await c.addInitScript(()=>{
+  window.voiceCalls=[];window.testVoices=[];window.voiceListener=null;
+  Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>window.testVoices,cancel:()=>{},speak:u=>window.voiceCalls.push(u.voice.lang),addEventListener:(name,fn)=>{if(name==='voiceschanged')window.voiceListener=fn;}}});
+  window.SpeechSynthesisUtterance=function(text){this.text=text;};
+ });
+ const p=await c.newPage();await p.goto(base);await seed(p);
+ await p.evaluate(()=>{Tafelberg.profile().settings.voice=true;});
+ await p.locator('.home .bubble').click();assert.deepEqual(await p.evaluate(()=>voiceCalls),[]);
+ for(const [voices,want] of [[['nl-NL','nl-BE'],'nl-BE'],[['en-US','nl-NL'],'nl-NL'],[['nl'],'nl']]){
+  await p.evaluate(v=>{testVoices=v.map(lang=>({lang}));voiceListener();},voices);
+  await p.locator('.home .bubble').click();assert.equal(await p.evaluate(()=>voiceCalls[voiceCalls.length-1]),want);
+ }
+ const raw=await p.evaluate(()=>Tafelberg.exportBackup());await p.evaluate(()=>Tafelberg.go('settings'));
+ await p.getByRole('button',{name:'Kopie terugzetten',exact:true}).click();await p.getByRole('textbox',{name:'Kopie van de voortgang',exact:true}).fill(raw);
+ p.once('dialog',d=>d.dismiss());await p.getByRole('button',{name:'Terugzetten',exact:true}).click();assert.equal(await p.evaluate(()=>Tafelberg.exportBackup()),raw);
+ p.once('dialog',d=>d.accept());await p.getByRole('button',{name:'Terugzetten',exact:true}).click();assert.equal(await p.evaluate(()=>Tafelberg.current().name),'who');
+ assert.equal(await p.evaluate(()=>Tafelberg.profile().name),'Klimmer');await c.close();
 }
 async function installation(browser,base){
  const variants=[['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1','iPhone',5,'ios-safari'],['ipad','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15','MacIntel',5,'ipad'],['ios-chrome','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) AppleWebKit/605.1.15 CriOS/130.0 Mobile/15E148 Safari/604.1','iPhone',5,'ios-chrome'],['android','Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36','Linux',5,'android-menu'],['whatsapp','Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 WhatsApp/2.0','iPhone',5,'in-app'],['desktop','Mozilla/5.0 Chrome/130 Safari/537.36','Linux',0,'desktop']];
@@ -70,7 +102,7 @@ async function functional(browser,base){
  const apk=await c.newPage();await apk.addInitScript(()=>{window.AndroidStore={get:()=>null,set:()=>{window.savedAndroid=true;}};});await apk.goto('file://'+path.resolve('app/src/main/assets/www/index.html'));await seed(apk);assert(await apk.evaluate(()=>window.savedAndroid));assert.equal(await apk.locator('link[rel="manifest"]').count(),0);assert.equal(await apk.evaluate(()=>!!window.TBWeb),false);await c.close();
 }
 (async()=>{fs.mkdirSync('test-results/screens',{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;const base=`http://127.0.0.1:${port}/tafelberg/`;
- try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]]){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
+ try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await voiceAndCopies(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
  finally{server.close();fs.writeFileSync('test-results/layout.json',JSON.stringify({results,failures,errors},null,2));}
  console.log(JSON.stringify({screens:results.length,failures:failures.length,errors},null,2));if(failures.length){console.log(JSON.stringify(failures.slice(0,20),null,2));process.exitCode=1;}if(errors.length)process.exitCode=1;
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
