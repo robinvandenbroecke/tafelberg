@@ -1,0 +1,20 @@
+{
+  "name": "tafelberg",
+  "version": "1.0.0",
+  "description": "Offline maaltafelspel en installeerbare webapp",
+  "scripts": {
+    "build:web": "node scripts/build-web.cjs",
+    "check:es5": "node scripts/check-es5.cjs",
+    "test": "node tests/web.cjs && node tests/offline.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "1.61.0",
+    "acorn": "8.15.0",
+    "qrcode": "1.5.4",
+    "sharp": "0.34.5"
+  },
+  "private": true
+}

@@ -11,3 +11,12 @@ captures/
 
 # signeersleutel blijft buiten git
 _signeersleutel/
+node_modules/
+_site/
+test-results/
+playwright-report/
+
+.test-browsers/
+
+*-run.log
+test-deps.log
