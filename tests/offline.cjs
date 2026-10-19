@@ -40,8 +40,12 @@ const server=https.createServer({key:fs.readFileSync('test-results/tls/key.pem')
  assert(await p.getByText('Dag Offline!',{exact:true}).isVisible());assert.equal(await other.locator('.equation').textContent(),equation);
  const caches=await p.evaluate(()=>window.caches.keys());assert.deepEqual(caches.filter(x=>x.startsWith('tafelberg-')),['tafelberg-test-next']);
  const manifest=await p.evaluate(()=>fetch('manifest.webmanifest').then(r=>r.json()));assert.equal(manifest.display,'standalone');assert.equal(manifest.start_url,'./?bron=app');assert.equal(manifest.icons.length,3);
+ if(name==='chromium'){
+  const devtools=await c.newCDPSession(p);const install=await devtools.send('Page.getInstallabilityErrors');
+  assert.deepEqual(install.installabilityErrors,[],JSON.stringify(install));await devtools.detach();
+ }
  const png=await p.evaluate(()=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve([img.width,img.height]);img.onerror=reject;img.src='icons/maskable-512.png';}));assert.deepEqual(png,[512,512]);
- reports.push({engine:name,offlineMode:name==='webkit'?'origin-unreachable':'browser-offline-and-origin-unreachable',offline:true,missingAudioTolerated:true,waitingUpdate:true,noMidRoundReload:true,multipleTabs:true,manifest:true});await c.close();
+ reports.push({engine:name,offlineMode:name==='webkit'?'origin-unreachable':'browser-offline-and-origin-unreachable',offline:true,missingAudioTolerated:true,waitingUpdate:true,noMidRoundReload:true,multipleTabs:true,manifest:true,installability:name==='chromium'?'no-errors':'manual-device-installation'});await c.close();
  }finally{await b.close();}
  }}finally{fs.writeFileSync(swPath,original);server.close();try{fs.rmSync('test-results/tls',{recursive:true});}catch(e){}fs.writeFileSync('test-results/offline.json',JSON.stringify(reports,null,2));}
  console.log(JSON.stringify(reports,null,2));
