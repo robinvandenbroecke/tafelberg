@@ -1480,7 +1480,9 @@ html.phone .sum-head .mo-fig { width: 52px; }
 html.phone .sum-head h1 { font-size: 1.8rem; }
 html.phone .sum-head .bubble { font-size: 0.9rem; }
 html.phone .sum-stat { width: 46%; margin: 3px 2%; padding: 5px; }
-html.phone .sum-n { font-size: 1.4rem; }
+html.phone .sum-n, html.phone.land .summary .sum-n { font-size: 1.4rem; }
+html.phone.land .sum-stats { width: 100%; max-width: 600px; }
+html.phone.land .sum-stat { width: 23%; margin: 3px 1%; }
 html.phone .sum-l { font-size: 0.75rem; }
 html.phone .sum-lvl-wrap { margin-top: 5px; }
 html.phone .sum-lvl .lvl-title { font-size: 1rem; }

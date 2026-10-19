@@ -38,7 +38,8 @@ async function metrics(page){return page.evaluate(()=>{
  const pad=document.querySelector('.keypad'),r=pad&&pad.getBoundingClientRect();
  const badPad=r&&(r.top<-.5||r.bottom>h+.5||r.left<-.5||r.right>w+.5);
  const active=document.activeElement;const over=document.documentElement.scrollWidth>document.documentElement.clientWidth;
- const off=[];for(const el of document.querySelectorAll('.sum-foot .btn,.cel-actions .btn,.np-start,.table-actions .btn,.home-actions .btn')){const b=el.getBoundingClientRect();if(b.height&&(b.top<0||b.bottom>h+.5))off.push(el.textContent);}
+ const off=[];for(const el of document.querySelectorAll('.sum-n')){const range=document.createRange();range.selectNodeContents(el);const text=range.getBoundingClientRect(),card=el.parentNode.getBoundingClientRect();if(text.left<card.left-1||text.right>card.right+1)off.push('Resultaattekst buiten kaart');}
+ for(const el of document.querySelectorAll('.sum-foot .btn,.cel-actions .btn,.np-start,.table-actions .btn,.home-actions .btn')){const b=el.getBoundingClientRect();if(b.height&&(b.top<0||b.bottom>h+.5))off.push(el.textContent);}
  return {over,small,pad:badPad?{top:r.top,bottom:r.bottom,h}:null,off};
 });}
 async function matrix(browser,type,base){
