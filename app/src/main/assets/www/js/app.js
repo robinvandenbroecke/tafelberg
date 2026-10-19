@@ -88,7 +88,7 @@
     };
   }
 
-  function defaultSettings() { return { tables: [2, 5, 10], len: 12, div: false, sound: true, auto: true, pace: 'auto', tempo: true, goal: 'gewoon', voice: true }; }
+  function defaultSettings() { return { tables: [2, 5, 10], len: 12, div: false, sound: true, vibrate: false, auto: true, pace: 'auto', tempo: true, goal: 'gewoon', voice: true }; }
 
   function defaultStore() { return { v: 2, device: { eink: null }, current: null, order: [], profiles: {} }; }
 
@@ -236,26 +236,73 @@
 
   function applyTheme() { setHtmlClass('eink', einkOn()); }
 
-  var lastPort = null;
+  var lastLayout = null;
   function isPort() { return (window.innerHeight || 0) >= (window.innerWidth || 0); }
 
   function fitRoot() {
     var w = window.innerWidth || document.documentElement.clientWidth;
     var hh = window.innerHeight || document.documentElement.clientHeight;
-    var base = Math.min(w, hh) / 38;
-    if (w > hh && w / hh > 1.45) base = Math.min(base, w / 58);
-    if (hh >= w && hh / w > 1.45) base = Math.min(base, hh / 58);
-    base = Math.max(11, Math.min(30, base));
+    var phone = Math.min(w, hh) < 600;
+    var base = phone ? Math.max(13, Math.min(18, Math.min(w, hh) / (w > hh ? 28 : 24))) : Math.max(11, Math.min(30, Math.min(w, hh) / 38));
     document.documentElement.style.fontSize = base.toFixed(2) + 'px';
-    setHtmlClass('land', w > hh);
-    setHtmlClass('port', w <= hh);
-    var port = w <= hh;
-    if (lastPort !== null && port !== lastPort && current && (current.name === 'home' || current.name === 'table')) go(current.name, current.params);
-    lastPort = port;
+    setHtmlClass('land', w > hh); setHtmlClass('port', w <= hh);
+    setHtmlClass('phone', phone); setHtmlClass('tablet', !phone);
+    var layout = [w, hh, phone].join(':');
+    // Geen herstart van een ronde, aftelklok, invoerveld of feestje bij draaien.
+    if (lastLayout !== null && layout !== lastLayout && current && /^(home|table|chart|medals|speed|who)$/.test(current.name)) {
+      go(current.name, current.params);
+    }
+    lastLayout = layout;
   }
 
   // ---------------------------------------------------------------- geluid
-  var audioCtx = null;
+  var audioCtx = null, mediaUnlocked = !!window.AndroidStore, clipAudio = null, browserVoice = null;
+  function chooseVoice() {
+    if (!window.speechSynthesis) return;
+    var voices;
+    try { voices = window.speechSynthesis.getVoices(); } catch (e) { return; }
+    browserVoice = null;
+    var wants = ['nl-be', 'nl-nl', 'nl'];
+    for (var j = 0; j < wants.length && !browserVoice; j++) {
+      for (var i = 0; i < voices.length; i++) {
+        var lang = (voices[i].lang || '').toLowerCase().replace('_', '-');
+        if (lang === wants[j] || (wants[j] === 'nl' && lang.indexOf('nl-') === 0)) { browserVoice = voices[i]; break; }
+      }
+    }
+  }
+  function hushPromise(value) { if (value && typeof value.then === 'function') value.then(function () {}, function () {}); }
+  function unlockMedia() {
+    mediaUnlocked = true;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        if (!audioCtx) audioCtx = new AC();
+        if (audioCtx.resume) hushPromise(audioCtx.resume());
+        var source = audioCtx.createBufferSource();
+        source.buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        source.connect(audioCtx.destination); source.start(0);
+      }
+      if (!clipAudio && window.Audio) {
+        clipAudio = new window.Audio();
+        // Zelfde audio-element hergebruiken na ontgrendeling door een echte tik.
+        clipAudio.src = 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA';
+        hushPromise(clipAudio.play());
+      }
+    } catch (e) { /* geen geluid is geen spelprobleem */ }
+    chooseVoice();
+  }
+  document.addEventListener('touchend', unlockMedia, true);
+  document.addEventListener('click', unlockMedia, true);
+  document.addEventListener('keydown', function () { if (!mediaUnlocked) unlockMedia(); }, false);
+  if (window.speechSynthesis) {
+    chooseVoice();
+    if (window.speechSynthesis.addEventListener) window.speechSynthesis.addEventListener('voiceschanged', chooseVoice, false);
+  }
+  function vibrate(pattern) {
+    if (S && S.current && P().settings.vibrate && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(pattern); } catch (e) { /* niet ondersteund */ }
+    }
+  }
   function play(notes, step) {
     var pr = S && S.current ? P() : null;
     if (!pr || !pr.settings.sound) return;
@@ -263,6 +310,8 @@
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       if (!audioCtx) audioCtx = new AC();
+      if (!mediaUnlocked) return;
+      if (audioCtx.resume) hushPromise(audioCtx.resume());
       var t0 = audioCtx.currentTime + 0.01;
       for (var i = 0; i < notes.length; i++) {
         var o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = t0 + i * step;
@@ -277,12 +326,12 @@
     } catch (e) { /* geen geluid, geen probleem */ }
   }
   var SND = {
-    ok: function () { play([659, 880], 0.09); },
-    fast: function () { play([659, 880, 1175], 0.08); },
-    combo: function () { play([784, 988, 1175, 1568], 0.07); },
-    oops: function () { play([392, 349], 0.14); },
+    ok: function () { vibrate(15); play([659, 880], 0.09); },
+    fast: function () { vibrate(15); play([659, 880, 1175], 0.08); },
+    combo: function () { vibrate(15); play([784, 988, 1175, 1568], 0.07); },
+    oops: function () { vibrate([15, 60, 15]); play([392, 349], 0.14); },
     done: function () { play([523, 659, 784, 1047], 0.12); },
-    tick: function () { play([1047], 0.04); }
+    tick: function () { vibrate(15); play([1047], 0.04); }
   };
 
   // ---------------------------------------------------------------- iconen
@@ -632,10 +681,18 @@
     if (!pr || pr.settings.voice === false || !text) return;
     try {
       if (window.AndroidSpeech && typeof window.AndroidSpeech.speak === 'function') { window.AndroidSpeech.speak(text); return; }
-      if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
+      if (!mediaUnlocked) return;
+      var clips = window.TB_CLIPS || {}, clip = clips[text];
+      if (clip && typeof clip === 'object') clip = clip.file || clip.src;
+      if (clip && clipAudio && /^voice\/[a-zA-Z0-9_./-]+\.(mp3|m4a|wav|ogg)$/.test(clip)) {
+        clipAudio.src = clip; hushPromise(clipAudio.play()); return;
+      }
+      chooseVoice();
+      if (browserVoice && window.speechSynthesis && window.SpeechSynthesisUtterance) {
         window.speechSynthesis.cancel();
         var u = new window.SpeechSynthesisUtterance(text);
-        u.lang = 'nl-BE';
+        u.voice = browserVoice;
+        u.lang = browserVoice.lang;
         u.rate = 0.95;
         window.speechSynthesis.speak(u);
       }
@@ -644,6 +701,7 @@
 
   function stopSpeaking() {
     try {
+      if (clipAudio) clipAudio.pause();
       if (window.AndroidSpeech && typeof window.AndroidSpeech.stop === 'function') window.AndroidSpeech.stop();
       else if (window.speechSynthesis) window.speechSynthesis.cancel();
     } catch (e) { /* niets */ }
@@ -817,7 +875,7 @@
   document.addEventListener('keydown', function (e) {
     var k = keyFromEvent(e);
     if (!k) return;
-    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
     if (k === 'esc') { if (current && current.back) current.back(); return; }
     if (keyHandler) { e.preventDefault(); keyHandler(k); }
   }, false);
@@ -827,11 +885,13 @@
 
   function go(name, params) {
     clearTimers();
+    stopSpeaking();
     keyHandler = null;
     current = { name: name, params: params || {}, back: null };
     root.innerHTML = '';
     screens[name](current.params);
     window.scrollTo(0, 0);
+    if (window.TBWeb) window.TBWeb.screen(name, current.params, current.back);
   }
 
   // Androids terugknop vraagt eerst aan het spel of het zelf kan teruggaan.
@@ -1098,6 +1158,7 @@
         ]),
         h('div', { class: 'bar-side bar-right' }, right)
       ]),
+      window.TBWeb ? h('div', { class: 'web-notices' }) : null,
       rangeEl,
       h('div', { class: 'home-actions' }, [
         h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
@@ -2979,6 +3040,118 @@
     return h('div', { class: 'progress' }, kids);
   }
 
+  // Een kopie bevat alle spelers. Alleen geldige spelopslag mag de huidige vervangen.
+  function validateBackup(st) {
+    if (!st || st.v !== 2 || !st.device || !st.profiles || !Array.isArray(st.order) || st.order.length > 50) throw new Error('Geen geldige Tafelberg-kopie.');
+    function plain(o) { return o && Object.prototype.toString.call(o) === '[object Object]'; }
+    function check(o, defaults) {
+      if (!plain(o)) throw new Error('Ongeldige gegevens in de kopie.');
+      for (var k in defaults) if (defaults.hasOwnProperty(k) && o[k] !== undefined && defaults[k] !== null) {
+        var d = defaults[k], v = o[k];
+        if (typeof v !== typeof d || (typeof d === 'number' && (!isFinite(v) || v < 0)) || (Array.isArray(d) && !Array.isArray(v)) || (plain(d) && !plain(v))) throw new Error('Ongeldige gegevens in de kopie.');
+      }
+    }
+    var seen = {};
+    for (var i = 0; i < st.order.length; i++) {
+      var id = st.order[i], p = st.profiles[id];
+      if (typeof id !== 'string' || !/^p[a-z0-9]+$/i.test(id) || seen[id] || !p || p.id !== id || typeof p.name !== 'string' || !p.name.length || p.name.length > 20) throw new Error('Ongeldige speler in de kopie.');
+      seen[id] = true;
+      if (typeof p.color !== 'number' || !isFinite(p.color) || p.color < 0 || p.color % 1 !== 0) throw new Error('Ongeldige kleur.');
+      check(p.settings, defaultSettings()); check(p.stats, defaultStats());
+      if (!Array.isArray(p.settings.tables) || !p.settings.tables.length || p.settings.tables.length > 10 || [8,12,16,20].indexOf(p.settings.len) < 0) throw new Error('Ongeldige instellingen.');
+      for (var t = 0; t < p.settings.tables.length; t++) if (typeof p.settings.tables[t] !== 'number' || p.settings.tables[t] < 1 || p.settings.tables[t] > 10 || p.settings.tables[t] % 1) throw new Error('Ongeldige tafel.');
+      if (p.stats.lm) check(p.stats.lm, defaultLm());
+      if (p.settings.pace !== undefined && ['auto','rustig','gewoon','snel'].indexOf(p.settings.pace) < 0) throw new Error('Ongeldig leertempo.');
+      if (p.settings.goal !== undefined && ['klein','gewoon','groot'].indexOf(p.settings.goal) < 0) throw new Error('Ongeldig dagdoel.');
+      var stt = p.stats;
+      if (stt.hist) for (var hi = 0; hi < stt.hist.length; hi++) { check(stt.hist[hi], { d: '', acc: 0, think: 0, pace: 0 }); }
+      var lists = ['played', 'hutDays'];
+      for (var li = 0; li < lists.length; li++) if (stt[lists[li]]) for (var di = 0; di < stt[lists[li]].length; di++) {
+        if (typeof stt[lists[li]][di] !== 'string') throw new Error('Ongeldige kalender.');
+      }
+      if (stt.today) check(stt.today, { d: '', stars: 0, hit: false, chest: false });
+      if (stt.race) for (var rk in stt.race) if (stt.race.hasOwnProperty(rk)) {
+        check(stt.race[rk], { best: 0, medal: 0 });
+        if (typeof stt.race[rk].best !== 'number' || typeof stt.race[rk].medal !== 'number' || stt.race[rk].medal > 3) throw new Error('Ongeldig racerecord.');
+      }
+      if (stt.mo) for (var slot in stt.mo) if (stt.mo.hasOwnProperty(slot) && stt.mo[slot] !== null && typeof stt.mo[slot] !== 'string') throw new Error('Ongeldige kleren.');
+
+      if (!plain(p.facts)) throw new Error('Ongeldige sommen.');
+      for (var f in p.facts) if (p.facts.hasOwnProperty(f)) {
+        if (!/^(10|[1-9])x(10|[1-9])$/.test(f)) throw new Error('Ongeldige som.');
+        check(p.facts[f], { b: 0, n: 0, c: 0, due: 0, last: 0, rt: 0 });
+        if (typeof p.facts[f].b !== 'number' || p.facts[f].b > 5 || p.facts[f].b % 1) throw new Error('Ongeldig niveau.');
+      }
+    }
+    if (st.current !== null && !seen[st.current]) throw new Error('De huidige speler ontbreekt.');
+    return normalise(st);
+  }
+
+  function restoreBackup(raw) {
+    if (typeof raw !== 'string' || raw.length > 2000000) throw new Error('De kopie is te groot.');
+    var candidate = JSON.parse(raw, function (k, v) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype' || k === 'hasOwnProperty') throw new Error('Ongeldige sleutel in de kopie.');
+      return v;
+    });
+    candidate = validateBackup(candidate);
+    var json = JSON.stringify(candidate), b = bridge();
+    // Eerst duurzaam opslaan. Bij een volle/geblokkeerde opslag blijft S intact.
+    if (b) b.set(json); else window.localStorage.setItem(STORE_KEY, json);
+    S = candidate; pending = []; applyTheme();
+    go(S.order.length ? 'who' : 'newPlayer');
+  }
+
+  function backupBlock() {
+    var code = h('textarea', { class: 'backup-code', rows: '5', 'aria-label': 'Kopie van de voortgang', spellcheck: 'false' });
+    var status = h('p', { class: 'set-note', role: 'status' });
+    var panel = h('div', { class: 'backup-panel', hidden: 'hidden' });
+    var file = h('input', { type: 'file', accept: '.json,application/json', 'aria-label': 'Kopiebestand kiezen' });
+    function show(text) { panel.hidden = false; if (text !== undefined) code.value = text; }
+    function fallback(raw) { show(raw); status.textContent = 'Selecteer de tekst en bewaar hem op een veilige plek.'; code.focus(); code.select(); }
+    function download(raw) {
+      var URL = window.URL || window.webkitURL;
+      if (!URL || !URL.createObjectURL || !window.Blob || !('download' in document.createElement('a'))) { fallback(raw); return; }
+      var link = h('a', { download: 'Tafelberg-voortgang-' + todayStr() + '.json' });
+      var url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); link.href = url;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+      status.textContent = 'Kopie gedownload. Bewaar het bestand op een veilige plek.';
+    }
+    function exportCopy() {
+      var raw = JSON.stringify(S);
+      try {
+        if (navigator.share && navigator.canShare && window.File) {
+          var f = new File([raw], 'Tafelberg-voortgang.json', { type: 'application/json' });
+          if (navigator.canShare({ files: [f] })) {
+            navigator.share({ files: [f], title: 'Tafelberg-voortgang' }).then(function () { status.textContent = 'Kopie gedeeld.'; }, function (e) { if (!e || e.name !== 'AbortError') download(raw); }); return;
+          }
+        }
+      } catch (e) { /* gewone download als terugval */ }
+      download(raw);
+    }
+    function restore() {
+      try {
+        validateBackup(JSON.parse(code.value));
+        if (!window.confirm('Deze kopie vervangt alle spelers en voortgang op dit toestel. Eerst een kopie maken? Kies Annuleren. Terugzetten? Kies OK.')) return;
+        restoreBackup(code.value);
+      } catch (e) { status.textContent = 'Niet teruggezet: ' + (e.message || 'ongeldige kopie') + ' Je voortgang is niet gewijzigd.'; }
+    }
+    file.addEventListener('change', function () {
+      var f = file.files && file.files[0]; if (!f || !window.FileReader) return;
+      if (f.size > 2000000) { status.textContent = 'De kopie is te groot.'; return; }
+      var reader = new FileReader();
+      reader.onload = function () { show(String(reader.result)); status.textContent = 'Kopie ingelezen. Tik op Terugzetten om te bevestigen.'; };
+      reader.onerror = function () { status.textContent = 'Het bestand kon niet worden gelezen.'; };
+      reader.readAsText(f);
+    }, false);
+    add(panel, [h('p', { class: 'set-note' }, 'Plak je kopie of kies een JSON-bestand. Terugzetten vervangt alle spelers.'), code, file,
+      h('button', { class: 'btn btn-line', onclick: restore }, 'Terugzetten'),
+      h('button', { class: 'btn btn-line', onclick: function () { fallback(JSON.stringify(S)); } }, 'Toon kopietekst')]);
+    return h('section', { class: 'set-block backup' }, [h('h2', null, 'Voortgang bewaren'),
+      h('p', { class: 'set-note' }, 'Bewaar een kopie van alle spelers. Op iPhone en iPad kan de beginschermapp een eigen opslag hebben, los van Safari. Speel steeds via het icoon.'),
+      h('div', { class: 'backup-actions' }, [h('button', { class: 'btn btn-line', onclick: exportCopy }, 'Kopie maken'), h('button', { class: 'btn btn-line', onclick: function () { show(''); } }, 'Kopie terugzetten')]), panel, status]);
+  }
+
   // ---------- instellingen: per speler en voor het toestel
   screens.settings = function () {
     current.back = function () { go('home'); };
@@ -3088,9 +3261,11 @@
           h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Dagdoel'), h('span', { class: 'set-note' }, 'Hoeveel sterren per dag. Een ronde levert er meestal 15 tot 30 op.'), goalWrap]),
           toggle('Mo leest voor', 'Mo zegt zijn zinnen hardop. Op Android is daarvoor een Nederlandse stem nodig.', function () { return st.voice !== false; }, function (v) { st.voice = v; if (!v) stopSpeaking(); }),
           toggle('Deelsommen meeoefenen', 'Zoals 12 : 3. Pas als de maalsom al goed gaat.', function () { return !!st.div; }, function (v) { st.div = v; }),
+          typeof navigator.vibrate === 'function' ? toggle('Trillen', 'Een korte trilling bij een antwoord.', function () { return !!st.vibrate; }, function (v) { st.vibrate = v; }) : null,
           toggle('Geluid', null, function () { return !!st.sound; }, function (v) { st.sound = v; }),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Opnieuw beginnen'), h('span', { class: 'set-note' }, 'Wist alle niveaus, sterren en medailles van ' + pr.name + '.')]), resetBtn]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Speler verwijderen'), h('span', { class: 'set-note' }, 'Haalt ' + pr.name + ' en alle voortgang weg.')]), removeBtn]),
+          backupBlock(),
           h('h2', { class: 'set-head' }, 'Dit toestel'),
           toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { S.device.eink = v; applyTheme(); }),
           h('div', { class: 'set-row' }, [
@@ -3124,7 +3299,8 @@
     fitRoot();
     window.addEventListener('resize', fitRoot, false);
     window.addEventListener('orientationchange', function () { window.setTimeout(fitRoot, 200); }, false);
-    document.addEventListener('contextmenu', function (e) { e.preventDefault(); }, false);
+    document.addEventListener('contextmenu', function (e) { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); }, false);
+    if (window.TBWeb) window.TBWeb.init(window.Tafelberg);
     if (!S.order.length) go('newPlayer');
     else if (S.order.length > 1) go('who');
     else go('home');
@@ -3133,6 +3309,9 @@
   // Voor tests in een gewone browser.
   window.Tafelberg = {
     state: function () { return S; },
+    exportBackup: function () { return JSON.stringify(S); },
+    restoreBackup: restoreBackup,
+    current: function () { return current; },
     profile: function () { return P(); },
     grade: function (q, ok, ms, assisted, corrected) { return grade(q, ok, ms, assisted, corrected); },
     makeQuestion: makeQuestion,
