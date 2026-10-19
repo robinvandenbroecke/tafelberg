@@ -12,6 +12,7 @@ const base = process.env.TB_SITE_URL || `https://${repo.split('/')[0]}.github.io
   fs.rmSync(out, {recursive: true, force: true});
   fs.cpSync(root, out, {recursive: true});
   fs.cpSync('web', out, {recursive: true});
+  fs.mkdirSync(path.join(out, 'icons'), {recursive:true});
   const fg = 'app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png';
   for (const [name, size, fraction] of [['icon-192',192,.86],['icon-512',512,.86],['maskable-512',512,.68],['apple-touch-icon',180,.86]]) {
     const width = Math.round(size * fraction);

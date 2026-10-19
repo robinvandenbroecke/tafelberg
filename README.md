@@ -140,3 +140,57 @@ Lokaal bouwen kan met `./gradlew assembleRelease` (Java 17 en de Android SDK zij
 ## Lettertypen
 
 Fredoka (koppen en cijfers) en Andika (tekst, ontworpen voor beginnende lezers), beide onder de SIL Open Font License. De licenties staan in `app/src/main/assets/www/fonts/`.
+
+## Webapp op telefoon en tablet
+
+- Spelen: https://robinvandenbroecke.github.io/tafelberg/
+- Installeren: https://robinvandenbroecke.github.io/tafelberg/installeer/
+
+De installatiepagina kiest de uitleg voor Android, iPhone, iPad of een ingebouwde browser. Op een computer toont ze een QR-code. Android-browsers die installatie ondersteunen tonen een installatieknop; de gebruiker bevestigt daarna de Android-vraag. Op iOS gebruik je het deelmenu en **Zet op beginscherm**. De plaats van het deelmenu kan met de browserversie en adresbalkinstelling verschillen; de pagina geeft ook die terugval aan.
+
+### Eenmalige instelling door de eigenaar
+
+Maak de repository publiek en kies bij **Settings → Pages → Build and deployment → Source → GitHub Actions**. De workflow `pages.yml` publiceert daarna elke push naar `main`. Er is geen aparte websiteversie van het spel: de bouwstraat kopieert dezelfde `www/`-map naar `_site/`, voegt `web/` toe en maakt de iconen, QR-code en offline-bestandenlijst. De cacheversie gebruikt de commit-SHA. Webspecifieke manifest- en service-workerlinks worden alleen in de webbuild ingevoegd. De bestaande APK-workflow en Android-schil zijn niet gewijzigd.
+
+### Offline en updates
+
+Open het spel één keer met internet en wacht tot de eerste offline-cache klaar is. Daarna werken het spel, de lettertypen, de installatiepagina en aanwezige opnames zonder internet. De browser kan opslag alsnog wissen bij ruimtegebrek of na het wissen van websitegegevens. De app vraagt waar mogelijk om blijvende opslag; dat is geen garantie.
+
+Een nieuwe versie wacht op de achtergrond. Alleen op het startscherm verschijnt **Er is een nieuwe versie. Tik om bij te werken.** De app slaat eerst de voortgang op en herlaadt pas na die tik. Een ronde wordt niet automatisch herstart. In andere open vensters wordt evenmin midden in een ronde herladen; open die later opnieuw om de nieuwe code te laden.
+
+### Voortgang per toestel en kopieën
+
+De webapp bewaart de voortgang lokaal, per toestel, browser en installatie. Een iOS-beginschermapp kan een eigen opslag hebben, los van Safari. Speel daarom steeds via het icoon. Er is geen account of automatische synchronisatie.
+
+Onder **Instellingen → Voortgang bewaren** maakt **Kopie maken** een JSON-bestand met alle spelers, tafels, instellingen, sterren en medailles. Waar ondersteund kan je het bestand delen; anders wordt het gedownload. **Kopie terugzetten** laat een bestand kiezen of kopietekst plakken, controleert de gegevens en vraagt bevestiging voordat alle lokale spelers worden vervangen. Met **Toon kopietekst** kan je de huidige opslag ook selecteren en kopiëren als downloaden niet werkt. Bewaar die kopie zelf op een veilige plek; ze bevat de namen van de spelers.
+
+### Webapp of APK?
+
+De webapp werkt op iPhone, iPad en moderne Android-browsers. Geluid en de Nederlandse browserstem starten pas na een tik. Beschikbare stemmen hangen af van het toestel. Opgenomen clips zijn optioneel: voeg ze onder `www/voice/` toe met een ES5-`clips.js` (`window.TB_CLIPS` met tekst → relatief `voice/naam.mp3`-pad). Alle aanwezige opnames worden offline bewaard; een mislukte opname verhindert niet dat de rest wordt geïnstalleerd.
+
+Voor **Boox en oude Android-tablets blijft de APK aanbevolen**. De APK gebruikt zijn eigen Android-opslag, terugknop en spraakmotor. Het manifest, de service worker, installatiebalk en browsergeschiedenis worden daar niet geladen. E-ink blijft op het web een handmatige instelling; `?eink=1` blijft ook bruikbaar.
+
+### Ontwikkelen en automatische controle
+
+JavaScript dat door het spel of de installatiepagina wordt geladen is ES5. Alleen de service worker en Node-bouwscripts mogen modernere taalonderdelen gebruiken.
+
+```sh
+npm ci
+npm run check:es5
+npm run build:web
+npx playwright install --with-deps chromium webkit
+npm test
+```
+
+`pages.yml` voert dezelfde controle op GitHub uit vóór publicatie. De schermmatrix en screenshots staan 14 dagen bij het artefact **webapp-browsercontrole**. `_site/`, `node_modules/` en de screenshots worden niet in Git gezet. `tests/web.cjs` controleert in Chromium en WebKit de gevraagde telefoon- en tabletmaten, horizontale overloop, tikdoelen, zichtbare toetsenblokken, installatievarianten, browserterugknop, draaien tijdens een ronde, kopieën en de `file://`-APK-terugval. Aanvullende offline- en updatecontroles staan bij de tests. WebKit op Linux is een browserregressietest en vervangt geen echte iPhone.
+
+### Handmatig testen
+
+- **iPhone:** installeren via delen; via het icoon openen; daarna vliegtuigmodus en opnieuw openen. Geluid na de eerste tik, Nederlandse stem van Mo, notch/thuisbalk staand en liggend (beide kanten) controleren. Kopie uit Safari in de beginschermapp terugzetten.
+- **iPad:** installeren; staand, liggend, Split View en Slide Over; toetsen en onderbalk mogen niet achter systeemranden vallen.
+- **Android-telefoon:** installatieknop plus systeembevestiging; offline openen; teruggebaar vanuit oefenen naar de tafel en naar huis; trillen aan/uit in Instellingen.
+- **Updates:** een ronde open laten terwijl een nieuwe versie wordt gepubliceerd; er mag niets herstarten. Terug naar huis, op de updatemelding tikken en voortgang controleren. Herhalen met twee vensters.
+- **Galaxy Tab S3 en Boox:** APK starten, spelen, voortgang bewaren, Android-terugknop en spraak controleren; Boox moet de bestaande e-inkweergave behouden. Dit vraagt een echt toestel.
+- **Opnames en spraak:** echte Safari-audiotoestemming, geïnstalleerde Nederlandse stemmen en eventuele ontbrekende mp3's controleren. Browseremulatie kan dit niet volledig bewijzen.
+
+Automatisch reeds lokaal gecontroleerd: ES5; 240 Chromium-schermen op 15 formaten; installatievarianten; kopieën; browserterugknop; draaien zonder rondeverlies; file://-APK-terugval; manifest en iconen; offline herladen; ontbrekende audio; wachtende updates; geen herladen in een andere actieve ronde. De volledige Chromium- én WebKit-controle draait tevens in de publicatieworkflow. Echte systeeminstallatie, iOS-audiotoestemming en fysieke safe areas blijven handmatige toestelcontroles.

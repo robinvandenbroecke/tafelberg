@@ -1284,3 +1284,272 @@ html.eink .medal.locked .micon.icon-flag .fill { fill: #9A9A9A; }
 .sum-foot .sum-actions { margin-top: 0; }
 .summary .sum-n { font-size: 1.6rem; }
 .summary .sum-stat { padding-left: 0.3rem; padding-right: 0.3rem; }
+
+/* ---------- gedeelde telefoon- en browserbasis (oude WebViews houden de terugval) */
+html, body { overscroll-behavior: none; color-scheme: light; }
+.app { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+input, textarea, select { font-size: 16px; -webkit-user-select: text; user-select: text; }
+button, [role="switch"] { min-width: 44px; min-height: 44px; }
+/* De compacte tabelrij is een tikdoel van 44 hoog, ook bij kleine celbreedtes. */
+.chart-t { min-width: 0; min-height: 44px; }
+[hidden] { display: none !important; }
+.backup { margin-top: 1rem; }
+.backup h2 { font: 600 1.5rem 'Fredoka', sans-serif; }
+.backup-actions, .backup-panel { margin-top: 0.5rem; }
+.backup-actions { display: flex; flex-wrap: wrap; }
+.backup-actions .btn, .backup-panel .btn { margin: 0.3rem 0.4rem 0.3rem 0; }
+.backup-code { width: 100%; max-width: 100%; min-height: 100px; padding: 0.5rem; border: 2px solid #A9C1D8; border-radius: 0.7rem; }
+.backup-panel input { max-width: 100%; padding: 10px 0; }
+.web-notices { flex: 0 0 auto; position: relative; z-index: 3; }
+.web-notices:empty { display: none; }
+.web-update, .web-install { display: flex; align-items: center; width: 100%; background: #FFF2CF; color: #1F2A44; padding: 6px 14px; font-size: 14px; text-align: left; }
+.web-install { background: #EDF5FB; }
+.web-install a { flex: 1; color: #1F2A44; padding: 4px 0; }
+.web-install button { flex: 0 0 44px; font-size: 24px; }
+.web-update:focus-visible, .web-install a:focus-visible { outline: 2px solid #2F6FD0; }
+html.eink .web-install, html.eink .web-update { background: white; border: 1px solid black; }
+html.tablet .parents p { max-width: 36rem; }
+html.tablet .cel-main, html.tablet .speed-main { width: 100%; max-width: 66rem; margin-left: auto; margin-right: auto; }
+
+html.phone .screen { padding: 6px 10px 10px; }
+html.phone .screen.home { padding: 0; }
+html.phone .bar { min-height: 48px; }
+html.phone .bar h1 { font-size: 1.2rem; line-height: 1.15; }
+html.phone .bar-title { padding: 0 4px; }
+html.phone .bar-side { min-width: 44px; }
+html.phone .bar-right > * + * { margin-left: 5px; }
+html.phone .icon-btn { width: 44px; height: 44px; border-radius: 13px; }
+html.phone .stars { padding: 5px 8px; font-size: 1.05rem; }
+html.phone .stars .icon { width: 1.2rem; height: 1.2rem; }
+html.phone .btn { min-height: 44px; padding: 7px 10px; font-size: 1rem; }
+html.phone .btn-big { min-height: 56px; }
+html.phone .btn-sub { font-size: 0.8rem; }
+html.phone .player-chip { padding: 0 5px; min-height: 44px; }
+html.phone .player-chip .player-name { display: none; }
+html.phone .avatar { width: 32px; height: 32px; font-size: 20px; }
+html.phone .home-bar { padding: 6px 10px 0; }
+html.phone .chip-days { padding: 4px 7px; font-size: 1rem; }
+html.phone .chip-days .icon { width: 1.2rem; height: 1.2rem; }
+html.phone .hello { padding: 8px 12px 0; }
+html.phone .hello h1 { font-size: 1.6rem; }
+html.phone .hello-cards { margin-top: 5px; }
+html.phone .home-lvl { width: auto; flex: 1 1 auto; margin: 0 6px 0 0; padding: 4px 6px; }
+html.phone .lvl-n { width: 34px; height: 34px; font-size: 1.5rem; }
+html.phone .lvl-title { font-size: 1rem; }
+html.phone .lvl-need { font-size: 0.67rem; }
+html.phone .lvl-bar { height: 5px; margin: 4px 0; }
+html.phone .goal { padding: 5px 7px; min-width: 0; margin: 0; }
+html.phone .goal-ringbox { width: 36px; height: 36px; margin-right: 4px; }
+html.phone .goal-title { font-size: 0.85rem; }
+html.phone .goal-n { font-size: 0.7rem; }
+html.phone .home-mo { margin: 6px 12px 0; }
+html.phone .home-mo .mo-fig { width: 46px; }
+html.phone .home-mo .bubble { font-size: 0.85rem; padding: 6px 10px; min-height: 44px; }
+html.phone.port .home-actions { flex-wrap: wrap; padding: 7px 6px 10px; }
+html.phone.port .home-actions .btn-main { flex: 0 0 calc(100% - 8px); margin: 0 4px 6px; min-height: 54px; }
+html.phone .home-actions .btn-main .btn-title { font-size: 1.5rem; }
+html.phone.port .home-actions .btn-tile { flex: 1 1 0; margin: 0 3px; min-height: 48px; padding: 4px; }
+html.phone .home-actions .btn-tile .btn-title { font-size: 0.8rem; }
+html.phone .home-actions .btn-tile .icon { width: 18px; height: 18px; margin-right: 4px; }
+html.phone .range-row { min-height: 44px; }
+html.phone .peak { min-width: 0; }
+html.phone .peaks { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+html.phone.port .range-row { flex: 0 1 auto; }
+html.phone .range-svg { max-height: 100%; }
+html.phone .climb-wrap { max-width: 10rem; }
+html.phone .climb { height: 40px; }
+html.phone .combo.on { padding: 4px 6px; font-size: 1rem; }
+html.phone .combo .icon { width: 1rem; height: 1rem; }
+
+/* Toetsen blijven groot; de uitleg gebruikt wat er erboven overblijft. */
+html.phone.port .practice-main { flex-direction: column; }
+html.phone.port .padzone { width: 100%; max-width: none; flex: 0 0 auto; margin: 3px 0 0; }
+html.phone.port .key { height: 64px; min-height: 64px; margin: 3px 1%; font-size: 1.9rem; }
+html.phone .qzone { padding: 0; }
+html.phone .equation { font-size: 2.8rem; margin: 8px 0 4px; }
+html.phone .tok { margin: 0 0.07em; }
+html.phone .tok.blank { min-width: 1.6em; padding: 0.06em 0.12em; border-width: 2px; }
+html.phone .feedback { padding: 4px 7px; }
+html.phone .feedback.help, html.phone .feedback.fix { padding: 5px 8px; margin: 3px 0; overflow: hidden; }
+html.phone .fb-title { margin-bottom: 1px; }
+html.phone .fb-lead { font-size: 0.85rem; }
+html.phone .fb-eq { font-size: 1.25rem; }
+html.phone .fb-big { font-size: 1.8rem; }
+html.phone .fb-big .icon { width: 1.4rem; height: 1.4rem; }
+html.phone .fb-tip, html.phone .fb-cap, html.phone .fb-do, html.phone .fb-note { font-size: 0.8rem; line-height: 1.25; margin-top: 2px; }
+html.phone .fb-model { min-height: 18px; margin: 2px 0; }
+html.phone .fb-sub { font-size: 0.85rem; margin-top: 2px; }
+html.phone .fb-mo .mo-fig { width: 32px; }
+html.phone .fb-mo .bubble { font-size: 0.8rem; padding: 5px; }
+html.phone .help-row { min-height: 44px; padding-top: 0; }
+html.phone .tag { font-size: 0.8rem; padding: 2px 5px; }
+html.phone .intro-go { min-height: 44px; margin: 3px 0 0; }
+html.phone .tempo { margin: 0 10px; height: 15px; }
+html.phone.port .ladder-main { flex-direction: column; }
+html.phone.port .ladder-side { width: 100%; max-width: none; margin: 0; }
+html.phone .ladder-msg { min-height: 44px; font-size: 0.85rem; padding: 3px; }
+html.phone .msg-eq { font-size: 1.1rem; }
+html.phone .ladder-display { height: 44px; line-height: 40px; margin: 3px 1%; font-size: 2rem; }
+html.phone .sprint-run-art { max-height: 64px; }
+html.phone .sprint-svg { max-height: 64px; }
+html.phone .sprint-count { font-size: 1.4rem; }
+html.phone .sprint-count small { font-size: 0.65rem; }
+html.phone .sprint-timer { padding-top: 5px; }
+html.phone .sprint-fb { font-size: 1rem; min-height: 1.3em; }
+html.phone .race-top { margin: 3px 0; }
+html.phone .race-clock { font-size: 1.4rem; }
+html.phone .race-track { max-height: 48px; }
+html.phone .track { max-height: 48px; }
+html.phone .sprint-card { padding: 8px; width: 100%; max-height: 100%; }
+html.phone .sprint-card .mo-fig { width: 60px; }
+html.phone .sprint-card p { font-size: 0.9rem; }
+html.phone .sprint-card .bubble { font-size: 0.95rem; }
+html.phone .sprint-score { font-size: 1.8rem !important; }
+html.phone .end-card { padding: 5px; }
+html.phone .end-card h2 { font-size: 1.4rem; }
+html.phone .end-card p { font-size: 0.85rem; }
+
+html.phone .table-tip { font-size: 0.8rem; margin: 4px 0; }
+html.phone .table-main { flex-direction: column; }
+html.phone .facts { flex: 0 0 auto; margin: 0 0 4px; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+html.phone .fact-row { flex: 0 0 49%; min-height: 44px; height: 44px; margin: 1px 0; font-size: 1rem; padding: 0 6px; }
+html.phone .pips .pip { width: 5px; height: 5px; margin-left: 3px; }
+html.phone .fact-panel { min-height: 0; padding: 5px 8px; border-radius: 15px; }
+html.phone .panel-eq { font-size: 1.6rem; }
+html.phone .panel-model { min-height: 12px; margin: 3px 0; }
+html.phone .panel-groups { font-size: 0.8rem; margin-bottom: 3px; }
+html.phone .tip { font-size: 0.8rem; padding: 4px 6px; }
+html.phone .tip-head { font-size: 0.7rem; }
+html.phone .table-actions { margin-top: 5px; }
+html.phone .table-actions .btn + .btn { margin-left: 4px; }
+html.phone .table-actions .btn { padding: 4px; font-size: 0.85rem; }
+html.phone .table-actions .icon { width: 1.1rem; height: 1.1rem; margin-right: 4px; }
+html.phone .btn-time { display: none; }
+html.phone .chart-wrap { padding: 0; }
+html.phone .chart-axis { font-size: 0.8rem; margin: 0 0 6px; }
+html.phone .chart { width: 100%; max-width: 440px; margin: 0 auto; }
+html.phone .chart-row { width: 100%; display: flex; }
+html.phone .cell, html.phone .chart-h, html.phone .chart-t, html.phone .chart-corner { flex: 1 1 0; width: 0; min-width: 0; height: 28px; margin: 1px; font-size: 0.75rem; }
+html.phone .chart-t { height: 44px; }
+html.phone .chart-row:not(.chart-head) .cell { height: 44px; }
+html.phone .legend { padding: 5px 0; flex-wrap: wrap; }
+html.phone .legend .cell.mini { flex: 0 0 12px; width: 12px; height: 12px; }
+html.phone .legend-item { font-size: 0.7rem; }
+html.phone .chart-sum { margin: 5px 0; font-size: 0.85rem; }
+html.phone .record { width: 46%; margin: 3px 2%; padding: 4px; }
+html.phone .rec-n { font-size: 1.5rem; }
+html.phone .rec-l { font-size: 0.75rem; }
+html.phone .medal-card { width: 31.33%; margin: 4px 1%; padding: 6px 3px; }
+html.phone .medal-card .medal { width: 50px; height: 58px; }
+html.phone .mc-title { font-size: 0.85rem; }
+html.phone .mc-text { font-size: 0.7rem; }
+html.phone .set-main { flex-direction: column; }
+html.phone .set-col { flex: 0 0 auto; width: 100%; margin: 0 0 12px; }
+html.phone .set-row { flex-wrap: wrap; }
+html.phone .set-row .set-text { flex: 1 1 65%; min-width: 0; }
+html.phone .set-note { font-size: 0.8rem; }
+html.phone .set-row .seg { margin-top: 4px; }
+html.phone .seg-btn { padding: 6px 8px; font-size: 0.9rem; }
+html.phone .seg-wide { width: 100%; }
+html.phone .seg-wide .seg-btn { flex: 1 1 0; min-width: 0; }
+html.phone .tchip { width: 44px; height: 44px; margin: 3px; }
+html.phone .swatch { width: 44px; height: 44px; margin: 4px; }
+html.phone .name-input { max-width: 100%; font-size: 16px; }
+html.phone .parents { padding: 12px; }
+html.phone .parents p { font-size: 0.9rem; }
+html.phone .speed-main { padding: 6px 0; }
+html.phone .speed-mo .mo-fig { width: 52px; }
+html.phone .speed-mo .bubble { font-size: 0.9rem; }
+html.phone .speed-sprint { padding: 10px; }
+html.phone .ss-title { font-size: 1.2rem; }
+html.phone .ss-sub { font-size: 0.8rem; }
+html.phone .race-card { width: 18%; margin: 4px 1%; padding: 6px 2px; min-width: 0; }
+html.phone .rc-t { font-size: 1.3rem; }
+html.phone .rc-medal { width: 28px; height: 34px; }
+html.phone .rc-time { font-size: 0.6rem; }
+html.phone .speed-h2 { font-size: 1.2rem; margin: 6px 0; }
+html.phone .kast-main { flex-direction: column; }
+html.phone .kast-left { flex: 0 0 auto; }
+html.phone .kast-mo .kast-big { width: 70px; }
+html.phone .kast-left .bubble { font-size: 0.9rem; }
+html.phone .kast-grid { flex: 1 1 auto; min-height: 0; }
+html.phone .kast-item { padding: 4px; }
+html.phone .kast-mini { width: 38px; height: 43px; }
+html.phone .ki-name, html.phone .ki-state { font-size: 0.8rem; }
+html.phone .sum-head .mo-fig { width: 52px; }
+html.phone .sum-head h1 { font-size: 1.8rem; }
+html.phone .sum-head .bubble { font-size: 0.9rem; }
+html.phone .sum-stat { width: 46%; margin: 3px 2%; padding: 5px; }
+html.phone .sum-n { font-size: 1.4rem; }
+html.phone .sum-l { font-size: 0.75rem; }
+html.phone .sum-lvl-wrap { margin-top: 5px; }
+html.phone .sum-lvl .lvl-title { font-size: 1rem; }
+html.phone .sum-blocks { margin-top: 5px; }
+html.phone .sum-block h2 { font-size: 0.95rem; }
+html.phone .sum-foot { padding-top: 5px; }
+html.phone .sum-actions .btn { font-size: 1rem; }
+html.phone .cel-main { justify-content: center; overflow: hidden; }
+html.phone .cel-body { margin: 4px 0; min-height: 0; }
+html.phone .cel-body h1 { font-size: 1.8rem; margin: 4px 0; }
+html.phone .cel-mo .mo-fig, html.phone .cel-mo.big .mo-fig { width: 58px; }
+html.phone .cel-mo .bubble { font-size: 0.9rem; padding: 8px; }
+html.phone .cel-sub, html.phone .cel-note { font-size: 0.85rem; }
+html.phone .cel-actions { min-height: 44px; flex: 0 0 auto; margin-top: 6px; }
+html.phone .bigsun { width: 75px; height: 75px; }
+html.phone .wd { margin: 0 3px; }
+html.phone .wd-dot { width: 34px; height: 34px; }
+html.phone .wd-name { font-size: 0.8rem; }
+html.phone .chest { width: 110px; height: 95px; }
+html.phone .reward, html.phone .reward-hint, html.phone .reward-got { font-size: 0.9rem; }
+html.phone .who-card { width: 42%; min-width: 0; padding: 10px; }
+html.phone .who-main h1 { font-size: 1.6rem; }
+html.phone .who-card .avatar.big { width: 52px; height: 52px; font-size: 26px; }
+html.phone .who-name { font-size: 1.3rem; }
+html.phone .np-card { padding: 10px; }
+html.phone .np-intro, html.phone .np-field .set-note { font-size: 0.8rem; }
+html.phone .np-field { margin-bottom: 6px; }
+html.phone .np-row { margin-bottom: 6px; }
+html.phone .np-start { min-height: 48px; }
+
+/* Liggende telefoons: grote toetsen rechts, sommen links. */
+html.phone.land .practice-main { flex-direction: row; }
+html.phone.land .padzone { width: 45%; max-width: 380px; margin: 0 0 0 8px; }
+html.phone.land .key { height: calc((100vh - 75px) / 4 - 6px); height: calc((100dvh - 75px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 4 - 6px); min-height: 44px; max-height: 76px; margin: 3px 1%; font-size: 1.8rem; }
+html.phone.land .equation { font-size: 2.6rem; margin: 4px 0; }
+html.phone.land .ladder-side { width: 48%; margin: 0; }
+html.phone.land .ladder .key { height: calc((100vh - 150px) / 4 - 6px); height: calc((100dvh - 150px) / 4 - 6px); min-height: 44px; }
+html.phone.land .ladder-msg { min-height: 30px; font-size: 0.8rem; }
+html.phone.land .ladder-display { min-height: 30px; height: 32px; line-height: 28px; }
+html.phone.land .ladder-main { flex-direction: row; }
+html.phone.land .hello { position: relative; top: 0; left: 0; padding: 4px 12px; }
+html.phone.land .hello h1 { font-size: 1.3rem; }
+html.phone.land .hello-cards, html.phone.land .home-mo { display: none; }
+html.phone.land .home-actions { padding: 4px 6px 6px; }
+html.phone.land .home-actions .btn { min-height: 44px; padding: 4px; margin: 0 4px; }
+html.phone.land .home-actions .btn-main .btn-title { font-size: 1.1rem; }
+html.phone.land .home-actions .btn-main .btn-sub { display: none; }
+html.phone.land .table-main { flex-direction: row; }
+html.phone.land .facts { flex: 0 0 48%; margin-right: 6px; }
+html.phone.land .fact-row { min-height: 44px; height: 44px; }
+html.phone.land .table-tip { display: none; }
+html.phone.land .table .bar { min-height: 44px; }
+html.phone.land .table-actions { margin-top: 3px; }
+html.phone.land .speed-mo { display: none; }
+html.phone.land .speed-sprint { padding: 4px 10px; }
+html.phone.land .race-card { width: 8%; margin: 2px 1%; }
+html.phone.land .rc-medal { display: none; }
+html.phone.land .kast-main { flex-direction: row; }
+html.phone.land .kast-left { width: 30%; }
+html.phone.land .cel-main { flex-direction: row; flex-wrap: wrap; }
+html.phone.land .cel-mo { width: 40%; margin-right: 12px; }
+html.phone.land .cel-body { max-width: 50%; }
+html.phone.land .cel-actions { width: 100%; }
+html.phone.land .chartscreen .chart-wrap { overflow-y: auto; }
+@media (max-height:700px) {
+  html.phone.port .feedback .fb-note { display: none; }
+  html.phone.port .fb-mo { display: none; }
+  html.phone.port .table .tip { font-size: 0.75rem; line-height: 1.2; }
+  html.phone.port .table .panel-groups { font-size: 0.7rem; }
+}
+html.phone .chart-t, html.phone .chart-corner { flex: 0 0 44px; width: 44px; min-width: 44px; }
+html.phone .chart-row .cell, html.phone .chart-t { margin-top: 0; margin-bottom: 0; }
