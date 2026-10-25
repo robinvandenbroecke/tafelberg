@@ -184,7 +184,15 @@ npm test
 
 `pages.yml` voert dezelfde controle op GitHub uit vóór publicatie. De schermmatrix en screenshots staan 14 dagen bij het artefact **webapp-browsercontrole**. `_site/`, `node_modules/` en de screenshots worden niet in Git gezet. `tests/web.cjs` controleert in Chromium en WebKit de gevraagde telefoon- en tabletmaten, horizontale overloop, tikdoelen, zichtbare toetsenblokken, installatievarianten, browserterugknop, draaien tijdens een ronde, kopieën en de `file://`-APK-terugval. Aanvullende offline- en updatecontroles staan bij de tests. Chromium controleert ook de installeerbaarheidsfouten via `Page.getInstallabilityErrors` (er mogen geen fouten zijn). WebKit op Linux is een browserregressietest en vervangt geen echte iPhone.
 
-### Handmatig testen
+### Online bewaren (werkversie)
+
+Google Sheets-synchronisatie is voorbereid op de werkbranch, maar nog niet actief: de endpoint-URL is leeg totdat de Google-machtiging, publicatie en echte verbinding zijn gecontroleerd. De lokale voortgang en kopiefunctie blijven werken. Na activatie kan elke klimmer via Instellingen → Online bewaren een eigen gebruikersnaam en zescijferige pincode kiezen en op een ander toestel verdergaan. Meerdere spelers blijven naast elkaar mogelijk.
+
+Bij verschillen blijft steeds de volledige versie met de meeste sterren bewaard; bij gelijkstand tellen afgeronde rondes en daarna de beheersing van de sommen. Er worden geen sterren van twee toestellen bij elkaar geteld. Binnenkomende voortgang wordt nooit midden in een ronde toegepast. Bewaar de herstelcode bij een ouder. Offline speel je lokaal verder; online aanmelden vraagt internet. Een lokale reset wist de verste online versie niet.
+
+Zie [server/apps-script/README.md](server/apps-script/README.md) voor installatie, de benodigde Google-toegang, beveiliging, quota en precieze testdekking. Controleer na activatie op twee echte toestellen: verschillende spelers, offline spelen en opnieuw verbinden, een oudere versie aanbieden, pincode herstellen en afmelden. Controleer de APK-netwerkbrug apart op Galaxy Tab S3 en Boox.
+
+### Handmatig testen op toestellen
 
 - **iPhone:** installeren via delen; via het icoon openen; daarna vliegtuigmodus en opnieuw openen. Geluid na de eerste tik, Nederlandse stem van Mo, notch/thuisbalk staand en liggend (beide kanten) controleren. Kopie uit Safari in de beginschermapp terugzetten.
 - **iPad:** installeren; staand, liggend, Split View en Slide Over; toetsen en onderbalk mogen niet achter systeemranden vallen.

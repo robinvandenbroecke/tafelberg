@@ -4,8 +4,10 @@
   "description": "Offline maaltafelspel en installeerbare webapp",
   "scripts": {
     "build:web": "node scripts/build-web.cjs",
+    "build:sync": "node scripts/build-sync.cjs",
     "check:es5": "node scripts/check-es5.cjs",
-    "test": "node tests/web.cjs && node tests/offline.cjs"
+    "test:sync": "node tests/sync.cjs && node tests/cloud.cjs",
+    "test": "npm run test:sync && node tests/web.cjs && node tests/offline.cjs"
   },
   "keywords": [],
   "author": "",
