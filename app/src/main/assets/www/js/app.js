@@ -161,6 +161,7 @@
     var raw = JSON.stringify(S), b = bridge();
     try { if (b) b.set(raw); } catch (e) { /* niets */ }
     try { window.localStorage.setItem(STORE_KEY, raw); } catch (e2) { /* niets */ }
+    if (window.TBCloud) window.TBCloud.saved();
   }
 
   // De speler die nu aan de beurt is.
@@ -892,6 +893,7 @@
     screens[name](current.params);
     window.scrollTo(0, 0);
     if (window.TBWeb) window.TBWeb.screen(name, current.params, current.back);
+    if (window.TBCloud) window.TBCloud.screen();
   }
 
   // Androids terugknop vraagt eerst aan het spel of het zelf kan teruggaan.
@@ -1206,6 +1208,15 @@
     return h('div', { class: 'deco', 'aria-hidden': 'true' }, rangeSvg(port ? [3, 7, 1, 9, 5] : [1, 3, 6, 2, 9, 7, 4, 8, 10, 5], port, true));
   }
 
+  screens.cloud = function (params) {
+    current.back = function () { go(S.current ? 'settings' : 'newPlayer'); };
+    window.TBCloud.render(root, params);
+  };
+
+  function cloudButton(label, params) {
+    return window.TBCloud && window.TBCloud.configured() ? h('button', { class: 'btn btn-line', onclick: function () { go('cloud', params || {}); } }, label) : null;
+  }
+
   // ---------- wie speelt er?
   screens.who = function () {
     current.back = S.current ? function () { go('home'); } : null;
@@ -1232,7 +1243,7 @@
     root.appendChild(h('div', { class: 'screen who' }, [
       topBar(current.back ? iconButton('back', 'Terug', current.back) : null,
         h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), null),
-      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cards]),
+      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cards, cloudButton('Online speler toevoegen', { mode: 'login' })]),
       decoRange()
     ]));
   };
@@ -1268,7 +1279,7 @@
     drawPreview();
 
     root.appendChild(h('div', { class: 'screen newplayer' }, [
-      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), null),
+      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), window.TBCloud && window.TBCloud.configured() ? h('button', { class: 'btn cloud-entry', 'aria-label': 'Online speler toevoegen', onclick: function () { go('cloud', { mode: 'login' }); } }, '☁') : null),
       h('div', { class: 'np-main' }, [
         h('div', { class: 'np-card' }, [
           first ? h('p', { class: 'np-intro' }, 'Elke tafel is een berg. Wie de sommen vlot kent, klimt naar de top.') : null,
@@ -3233,6 +3244,10 @@
     drawGoal();
 
     var resetBtn = twoTap('Voortgang wissen', 'Zeker? Tik nog eens', function () {
+      if (window.TBCloud && window.TBCloud.linked(pr.id)) {
+        if (!window.confirm('Online blijft de verste voortgang bewaard. Op dit toestel afmelden en opnieuw beginnen?')) return;
+        window.TBCloud.detach(pr.id);
+      }
       pr.facts = {};
       pr.stats = defaultStats();
       saveState();
@@ -3265,6 +3280,7 @@
           toggle('Geluid', null, function () { return !!st.sound; }, function (v) { st.sound = v; }),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Opnieuw beginnen'), h('span', { class: 'set-note' }, 'Wist alle niveaus, sterren en medailles van ' + pr.name + '.')]), resetBtn]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Speler verwijderen'), h('span', { class: 'set-note' }, 'Haalt ' + pr.name + ' en alle voortgang weg.')]), removeBtn]),
+          window.TBCloud && window.TBCloud.configured() ? h('section', { class: 'set-block' }, [h('h2', null, 'Online bewaren'), h('p', { class: 'set-note' }, window.TBCloud.status(pr.id)), cloudButton('Online bewaren', { id: pr.id })]) : null,
           backupBlock(),
           h('h2', { class: 'set-head' }, 'Dit toestel'),
           toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { S.device.eink = v; applyTheme(); }),
@@ -3301,6 +3317,7 @@
     window.addEventListener('orientationchange', function () { window.setTimeout(fitRoot, 200); }, false);
     document.addEventListener('contextmenu', function (e) { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); }, false);
     if (window.TBWeb) window.TBWeb.init(window.Tafelberg);
+    if (window.TBCloud) window.TBCloud.init(window.Tafelberg, h);
     if (!S.order.length) go('newPlayer');
     else if (S.order.length > 1) go('who');
     else go('home');
@@ -3309,6 +3326,22 @@
   // Voor tests in een gewone browser.
   window.Tafelberg = {
     state: function () { return S; },
+    cloudImport: function (pr, select) {
+      var candidate = defaultStore(); candidate.profiles[pr.id] = pr; candidate.order = [pr.id]; candidate.current = pr.id;
+      pr = validateBackup(JSON.parse(JSON.stringify(candidate))).profiles[pr.id];
+      var next = JSON.parse(JSON.stringify(S));
+      if (!next.profiles[pr.id]) next.order.push(pr.id);
+      next.profiles[pr.id] = pr; if (select) next.current = pr.id;
+      var raw = JSON.stringify(next), b = bridge();
+      if (b) b.set(raw); else window.localStorage.setItem(STORE_KEY, raw);
+      S = next; saveState(); return pr.id;
+    },
+    cloudReplaceId: function (oldId, pr) {
+      // Eerst het nieuwe profiel duurzaam bewaren, dan pas de oude lokale ID verwijderen.
+      this.cloudImport(pr, true);
+      if (oldId && oldId !== pr.id && S.profiles[oldId]) { delete S.profiles[oldId]; S.order.splice(S.order.indexOf(oldId), 1); saveState(); }
+    },
+    cloudSelect: function (id) { if (S.profiles[id]) { S.current = id; saveState(); } },
     exportBackup: function () { return JSON.stringify(S); },
     restoreBackup: restoreBackup,
     current: function () { return current; },

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Geen internettoegang nodig: alles zit in de app. -->
+    <!-- Alleen online bewaren gebruikt internet; het spel blijft volledig lokaal. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Nodig vanaf Android 11 om de spraakmotor te vinden (Mo leest voor). -->
     <queries>

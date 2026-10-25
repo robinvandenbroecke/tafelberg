@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+(function(){
+ 'use strict';var channel=<?!= channel ?>,peer=null,origin=null;
+ function send(data){data.channel=channel;window.top.postMessage(data,'*');}
+ window.addEventListener('message',function(e){
+  if(e.source!==window.top||!e.data||e.data.channel!==channel||e.data.type!=='tb-sync-request')return;
+  // De ouder heeft de willekeurige kanaalcode uit het iframe-adres. Pincodes staan nooit in de URL.
+  if(peer&&(e.source!==peer||e.origin!==origin))return;peer=e.source;origin=e.origin;
+  var id=e.data.id;
+  google.script.run.withSuccessHandler(function(result){send({type:'tb-sync-response',id:id,result:result});})
+   .withFailureHandler(function(){send({type:'tb-sync-response',id:id,result:{ok:false,message:'Online bewaren lukt nu niet.'}});}).rpc(e.data.request);
+ },false);
+ if(channel.length===64)send({type:'tb-sync-ready'});
+}());
+</script></body></html>

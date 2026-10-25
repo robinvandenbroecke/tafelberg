@@ -16,6 +16,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.Locale;
+import java.net.URL;
+import java.net.HttpURLConnection;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+import org.json.JSONObject;
 
 /**
  * Toont het spel (assets/www) schermvullend in een WebView.
@@ -27,6 +38,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
+    private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -67,6 +79,7 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Store(getSharedPreferences("tafelberg", MODE_PRIVATE)), "AndroidStore");
         startSpeech();
         web.addJavascriptInterface(new Speech(), "AndroidSpeech");
+        web.addJavascriptInterface(new Sync(), "AndroidSync");
         web.setWebViewClient(new WebViewClient() {
             @SuppressWarnings("deprecation")
             @Override
@@ -154,6 +167,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        syncExecutor.shutdownNow();
         if (tts != null) {
             tts.shutdown();
             tts = null;
@@ -192,6 +206,87 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean ready() {
             return ttsReady;
+        }
+    }
+
+    /** Alleen de meegeleverde Apps Script-dienst kan voortgang ontvangen.
+     * Geen externe iframe of ruimere file://-toegang nodig. */
+    final class Sync {
+        private final String endpoint;
+        Sync() {
+            String result = "";
+            try (InputStream in = getAssets().open("www/js/cloud-config.js")) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                StringBuilder source = new StringBuilder(); String line;
+                while ((line = reader.readLine()) != null) source.append(line);
+                Matcher match = Pattern.compile("TB_CLOUD_URL\\s*=\\s*'([^']*)'").matcher(source.toString());
+                if (match.find()) result = match.group(1);
+            } catch (Exception ignored) { }
+            endpoint = result;
+        }
+        @JavascriptInterface
+        public void request(final String url, final String id, final String body) {
+            if (id == null || !id.matches("r[0-9]{1,12}")) return;
+            if (body == null || body.length() > 100000 || endpoint.isEmpty() || !endpoint.equals(url)) {
+                reply(id, "{\"ok\":false,\"message\":\"Online bewaren is niet beschikbaar.\"}"); return;
+            }
+            if (syncExecutor.isShutdown()) return;
+            syncExecutor.execute(new Runnable() {
+                @Override public void run() {
+                    String result;
+                    try {
+                        URL current = new URL(endpoint); String method = "POST";
+                        result = null;
+                        for (int hop = 0; hop < 6; hop++) {
+                            String host = current.getHost();
+                            if (!"https".equals(current.getProtocol()) || current.getUserInfo() != null
+                                || (current.getPort() != -1 && current.getPort() != 443)
+                                || !("script.google.com".equals(host) || "script.googleusercontent.com".equals(host))) {
+                                throw new IllegalStateException("Onverwachte server");
+                            }
+                            HttpURLConnection conn = (HttpURLConnection) current.openConnection();
+                            try {
+                                conn.setConnectTimeout(15000); conn.setReadTimeout(45000);
+                                conn.setInstanceFollowRedirects(false); conn.setRequestMethod(method);
+                                if ("POST".equals(method)) {
+                                    conn.setDoOutput(true); conn.setRequestProperty("Content-Type", "text/plain; charset=utf-8");
+                                    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                                    conn.setFixedLengthStreamingMode(bytes.length);
+                                    try (java.io.OutputStream out = conn.getOutputStream()) { out.write(bytes); }
+                                }
+                                int status = conn.getResponseCode();
+                                if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+                                    current = new URL(current, conn.getHeaderField("Location"));
+                                    if (status == 301 || status == 302 || status == 303) method = "GET";
+                                    continue;
+                                }
+                                if (status != 200) throw new IllegalStateException("Niet beschikbaar");
+                                StringBuilder text = new StringBuilder();
+                                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                                    char[] part = new char[4096]; int length;
+                                    while ((length = reader.read(part)) != -1) {
+                                        text.append(part, 0, length);
+                                        if (text.length() > 200000) throw new IllegalStateException("Antwoord te groot");
+                                    }
+                                }
+                                result = new JSONObject(text.toString()).toString(); break;
+                            } finally { conn.disconnect(); }
+                        }
+                        if (result == null) throw new IllegalStateException("Te veel omleidingen");
+                    } catch (Exception ignored) {
+                        result = "{\"ok\":false,\"message\":\"Geen verbinding. Je voortgang blijft op dit toestel.\"}";
+                    }
+                    reply(id, result);
+                }
+            });
+        }
+        private void reply(final String id, final String json) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    if (web != null) web.evaluateJavascript("window.TBCloud && window.TBCloud.nativeReply("
+                        + JSONObject.quote(id) + "," + json + ");", null);
+                }
+            });
         }
     }
 
