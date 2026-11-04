@@ -13,7 +13,7 @@ Het spel draait volledig offline als Android-app en is afgestemd op twee toestel
 - **Tafel bekijken**: per som een stippenmodel met groepjes, de som als herhaald optellen, en een tip om ze slim af te leiden.
 - **Klim de tafelrij**: de tafel als telrij opzeggen, steen per steen naar de top, en daarna achteruit naar beneden.
 - **Oefenen**: korte rondes met een eigen toetsenblok. Gemengd over de gekozen tafels of per tafel. Een klimmertje gaat bij elke som een stap hoger. Zodra de juiste uitkomst getypt is, gaat het spel meteen verder; een foute uitkomst bevestigt het kind met OK. Wie eerst iets fouts typt en zelf verbetert, gaat ook verder, maar die som telt dan niet als meteen juist en stijgt niet in niveau. Zo levert gokken niets op. Hetzelfde geldt in de tafelrij en de sprint.
-- **Snelheid**: de sprint naar de hut (één minuut, alle gekende sommen door elkaar) en een race per tafel (de tien sommen zo snel mogelijk, met brons, zilver of goud). In beide loopt een schaduwklimmer mee in het tempo van het eigen record.
+- **Snelheid**: de sprint naar de hut (één minuut, gekende sommen uit de gekozen tafels door elkaar) en een race per tafel (de tien sommen zo snel mogelijk, met brons, zilver of goud). In beide loopt een schaduwklimmer mee in het tempo van het eigen record.
 - **Medailles**: eenentwintig medailles, van de eerste ronde tot alle toppen, plus records voor de langste reeks, de sprint, de bliksemreeks en het aantal dagen op rij.
 - **Mo de marmot**: de gids van het spel. Mo praat in korte zinnen, kan voorlezen en reageert op wat het kind doet. Bij elk nieuw klimniveau krijgt Mo iets om aan te trekken; in de kast van Mo kiest het kind wat Mo draagt.
 - **Mijn tafelkaart**: alle honderd sommen in één rooster, gekleurd volgens hoe goed ze zitten.
@@ -79,6 +79,8 @@ Een marge zorgt ervoor dat het tempo niet elke dag heen en weer springt. In de i
 
 **Nieuwe tafels.** Staat "Nieuwe tafels vanzelf erbij" aan, dan opent het spel een volgende berg zodra de huidige tafels goed genoeg zitten. De volgorde begint bij de steunpunten en gaat dan naar wat ervan afgeleid wordt: 2, 10, 5, 1, 4, 3, 6, 8, 9, 7. Tafels die nog niet aan de beurt zijn, liggen op het startscherm in de wolken, maar kunnen altijd bekeken en geoefend worden.
 
+Een tafel die je in Instellingen handmatig uitzet, wordt bij automatische uitbreiding overgeslagen totdat je ze zelf opnieuw kiest. Dit geldt ook na herstart en bij het terugzetten van een voortgangskopie. Er blijft minstens één tafel gekozen; kies dus eerst een andere tafel als je de laatste wilt uitzetten. Rechtstreeks oefenen of racen via een afzonderlijke berg blijft mogelijk. Wisselsommen kunnen dezelfde getallen in omgekeerde volgorde tonen: 5 × 2 kan bijvoorbeeld een wisselsom van de gekozen tafel van 5 zijn.
+
 Een simulatie over veertien dagen, met één ronde per dag, toont het verschil. Een sterke rekenaar zag 73 sommen en had alle tien tafels open. Een gemiddelde rekenaar zag 57 sommen in zeven tafels. Een zwakke rekenaar zag 19 sommen en bleef bij 2, 5 en 10, maar met meer herhaling en meer steun.
 
 In het ouderpaneel bij de instellingen staan het huidige leertempo, de juistheid, de denktijd en het verloop over de laatste rondes. Het kind zelf krijgt nooit een label als "rustig" te zien.
@@ -95,7 +97,9 @@ Verder:
 
 **Race per tafel.** De tien sommen van één tafel in willekeurige volgorde, een deel als wisselsom. De tijd loopt van start tot de laatste som juist is. Een fout toont de juiste som en zet ze achteraan. Medailles: brons onder 70 seconden, zilver onder 45, goud onder 30 (op e-ink een vijfde ruimer, omdat het scherm trager reageert). Een race gaat pas open als minstens zes sommen van die tafel vlot gaan, zodat snelheid volgt op inzicht.
 
-**Sprint naar de hut.** Eén minuut zoveel mogelijk sommen die al goed gaan, uit alle tafels. De hut staat bij het eigen record.
+**Sprint naar de hut.** Eén minuut zoveel mogelijk sommen die al goed gaan, uit de gekozen tafels. Zijn daarin minder dan zes sommen gekend, dan blijft de sprint gesloten; hij haalt geen sommen uit uitgezette tafels. De hut staat bij het eigen record.
+
+`npm run test:tables` controleert tafelkeuze via de browser, automatische uitbreiding, herladen, voortgangskopieën en de sprint. Deze regressiecontrole draait ook als onderdeel van `npm test` vóór publicatie.
 
 In beide loopt een grijze schaduwklimmer mee in het tempo van het eigen record. Een race of sprint verandert het niveau van een som niet, behalve bij een fout: dan zakt de som en komt ze terug bij het gewone oefenen.
 

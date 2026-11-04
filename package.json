@@ -5,7 +5,8 @@
   "scripts": {
     "build:web": "node scripts/build-web.cjs",
     "check:es5": "node scripts/check-es5.cjs",
-    "test": "node tests/web.cjs && node tests/offline.cjs"
+    "test:tables": "node tests/table-selection.cjs",
+    "test": "npm run test:tables && node tests/web.cjs && node tests/offline.cjs"
   },
   "keywords": [],
   "author": "",
