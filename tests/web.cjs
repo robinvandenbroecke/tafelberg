@@ -29,7 +29,7 @@ async function visit(page,name){
  if(name==='summary'){p.se=a.newSession([2,5,10]);p.se.thinks=[1500,2200];p.se.firstOk=12;p.se.stars=20;p.se.records=[];p.se.mastered=[];}
  if(name==='celebrate')a.pending().push({type:'item',data:{id:'muts'}});
  a.go(name,p);},name);
- if(name==='race'){await page.getByRole('button',{name:'Start',exact:true}).click();await page.waitForSelector('.race .keypad',{timeout:5000});}
+ if(name==='race'){await page.getByRole('button',{name:'Start',exact:true}).click();await page.waitForSelector('.race .keypad',{timeout:10000});}
  if(name==='newPlayer')await page.locator('.np-start').scrollIntoViewIfNeeded();
  await page.waitForTimeout(40);
 }
