@@ -9,10 +9,11 @@ permissions:
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +24,7 @@ jobs:
       - run: npm run check:es5
       - run: npm run build:web
       - name: Browsers klaarzetten
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium webkit
       - name: Schermen en offline gebruik controleren
         run: npm test
