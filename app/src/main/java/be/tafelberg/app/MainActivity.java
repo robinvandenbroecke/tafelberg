@@ -9,6 +9,10 @@ import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
@@ -47,9 +51,17 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         boolean eink = isEinkDevice();
+        int background = eink ? Color.WHITE : Color.rgb(0xEA, 0xF2, 0xF8);
+        configureSystemBars(background);
+        FrameLayout content = new FrameLayout(this);
+        content.setBackgroundColor(background);
+        installSafeInsets(content);
         web = new WebView(this);
-        web.setBackgroundColor(eink ? Color.WHITE : Color.rgb(0xEA, 0xF2, 0xF8));
-        setContentView(web);
+        web.setBackgroundColor(background);
+        content.addView(web, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(content);
+        content.requestApplyInsets();
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -117,21 +129,65 @@ public class MainActivity extends Activity {
         return id.contains("onyx") || id.contains("boox");
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) hideSystemBars();
+    /** Ook bij verplichte edge-to-edge (Android 15+) blijven de systeembalken zichtbaar. */
+    @SuppressWarnings("deprecation")
+    private void configureSystemBars(int background) {
+        Window window = getWindow();
+        // PhoneWindow heeft zijn DecorView nodig voordat de inset-controller wordt opgevraagd.
+        View decor = window.getDecorView();
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Build.VERSION.SDK_INT >= 23 ? background : Color.rgb(0x1F, 0x2A, 0x44));
+        window.setNavigationBarColor(Build.VERSION.SDK_INT >= 26 ? background : Color.rgb(0x1F, 0x2A, 0x44));
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false);
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.show(WindowInsets.Type.systemBars());
+                int light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                controller.setSystemBarsAppearance(light, light);
+            }
+        } else {
+            int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            if (Build.VERSION.SDK_INT >= 23) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Build.VERSION.SDK_INT >= 26) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            decor.setSystemUiVisibility(flags);
+        }
     }
 
+    /** Eén native eigenaar voor de veilige ruimte; de WebView krijgt alleen het bruikbare vlak. */
     @SuppressWarnings("deprecation")
-    private void hideSystemBars() {
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+    static void installSafeInsets(View content) {
+        content.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override public WindowInsets onApplyWindowInsets(View view, WindowInsets insets) {
+                int left, top, right, bottom;
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars()
+                            | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+                    android.graphics.Insets stable = insets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars());
+                    left = Math.max(safe.left, stable.left); top = Math.max(safe.top, stable.top);
+                    right = Math.max(safe.right, stable.right); bottom = Math.max(safe.bottom, stable.bottom);
+                } else {
+                    left = Math.max(insets.getSystemWindowInsetLeft(), insets.getStableInsetLeft());
+                    top = Math.max(insets.getSystemWindowInsetTop(), insets.getStableInsetTop());
+                    right = Math.max(insets.getSystemWindowInsetRight(), insets.getStableInsetRight());
+                    bottom = Math.max(insets.getSystemWindowInsetBottom(), insets.getStableInsetBottom());
+                    if (Build.VERSION.SDK_INT >= 28 && insets.getDisplayCutout() != null) {
+                        left = Math.max(left, insets.getDisplayCutout().getSafeInsetLeft());
+                        top = Math.max(top, insets.getDisplayCutout().getSafeInsetTop());
+                        right = Math.max(right, insets.getDisplayCutout().getSafeInsetRight());
+                        bottom = Math.max(bottom, insets.getDisplayCutout().getSafeInsetBottom());
+                    }
+                }
+                // Absolute maten, niet optellen: herhaalde dispatches mogen geen extra rand geven.
+                view.setPadding(left, top, right, bottom);
+                if (Build.VERSION.SDK_INT >= 30) return WindowInsets.CONSUMED;
+                WindowInsets consumed = insets.consumeSystemWindowInsets().consumeStableInsets();
+                return Build.VERSION.SDK_INT >= 28 ? consumed.consumeDisplayCutout() : consumed;
+            }
+        });
     }
 
     /** De terugknop gaat eerst terug binnen het spel; pas op het startscherm sluit de app. */

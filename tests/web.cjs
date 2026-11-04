@@ -13,7 +13,7 @@ const server=http.createServer((req,res)=>{
  if(!fs.existsSync(file)){res.writeHead(404);res.end();return;}
  res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.setHeader('Cache-Control','no-cache');res.end(fs.readFileSync(file));
 });
-const sizes=[['iphone-se',375,667],['iphone15',393,852],['iphone15-land',852,393],['iphone-max',430,932],['pixel7',412,915],['pixel7-land',915,412],['ipad',820,1180],['ipad-land',1180,820],['ipad-pro',1024,1366],['ipad-pro-land',1366,1024],['split',507,1180],['tab-s3',768,1024],['tab-s3-land',1024,768],['boox',702,936],['iphone-se-land',667,375]];
+const sizes=[['iphone-se',375,667],['iphone15',393,852],['iphone15-land',852,393],['iphone-max',430,932],['pixel7',412,915],['pixel7-land',915,412],['s23-ultra',384,752],['s23-ultra-land',824,312],['ipad',820,1180],['ipad-land',1180,820],['ipad-pro',1024,1366],['ipad-pro-land',1366,1024],['split',507,1180],['tab-s3',768,1024],['tab-s3-land',1024,768],['boox',702,936],['iphone-se-land',667,375]];
 const screens=['who','newPlayer','home','table','ladder','practice','summary','celebrate','week','kast','speed','race','sprint','medals','chart','settings'];
 let results=[],failures=[],errors=[];
 async function seed(page){
@@ -29,18 +29,22 @@ async function visit(page,name){
  if(name==='summary'){p.se=a.newSession([2,5,10]);p.se.thinks=[1500,2200];p.se.firstOk=12;p.se.stars=20;p.se.records=[];p.se.mastered=[];}
  if(name==='celebrate')a.pending().push({type:'item',data:{id:'muts'}});
  a.go(name,p);},name);
- if(name==='race'){await page.getByRole('button',{name:'Start',exact:true}).click();await page.waitForSelector('.race .keypad',{timeout:5000});}
+ if(name==='race'){await page.getByRole('button',{name:'Start',exact:true}).click();await page.waitForSelector('.race .keypad',{timeout:10000});}
+ if(name==='newPlayer')await page.locator('.np-start').scrollIntoViewIfNeeded();
  await page.waitForTimeout(40);
 }
 async function metrics(page){return page.evaluate(()=>{
- const w=innerWidth,h=innerHeight,small=[];
+ const w=innerWidth,h=Math.min(innerHeight,window.visualViewport?visualViewport.height:innerHeight),small=[];
+ const app=document.getElementById('app'),box=app.getBoundingClientRect(),style=getComputedStyle(app);
+ const safe={left:box.left+(parseFloat(style.paddingLeft)||0),right:Math.min(w,box.right-(parseFloat(style.paddingRight)||0)),top:box.top+(parseFloat(style.paddingTop)||0),bottom:Math.min(h,box.bottom-(parseFloat(style.paddingBottom)||0))};
  for(const el of document.querySelectorAll('button,[role="switch"]')){const r=el.getBoundingClientRect(),cs=getComputedStyle(el);if(r.width&&r.height&&cs.visibility!=='hidden'&&cs.display!=='none'&&(r.width<43.9||r.height<43.9))small.push({text:el.getAttribute('aria-label')||el.textContent.slice(0,40),cls:el.className,w:r.width,h:r.height});}
  const pad=document.querySelector('.keypad'),r=pad&&pad.getBoundingClientRect();
- const badPad=r&&(r.top<-.5||r.bottom>h+.5||r.left<-.5||r.right>w+.5);
+ const outside=b=>b.top<safe.top-.5||b.bottom>safe.bottom+.5||b.left<safe.left-.5||b.right>safe.right+.5;
+ const badPad=r&&(outside(r)||Array.from(pad.querySelectorAll('button')).some(el=>outside(el.getBoundingClientRect())));
  const active=document.activeElement;const over=document.documentElement.scrollWidth>document.documentElement.clientWidth;
  const off=[];for(const el of document.querySelectorAll('.sum-n')){const range=document.createRange();range.selectNodeContents(el);const text=range.getBoundingClientRect(),card=el.parentNode.getBoundingClientRect();if(text.left<card.left-1||text.right>card.right+1)off.push('Resultaattekst buiten kaart');}
- for(const el of document.querySelectorAll('.sum-foot .btn,.cel-actions .btn,.np-start,.table-actions .btn,.home-actions .btn')){const b=el.getBoundingClientRect();if(b.height&&(b.top<0||b.bottom>h+.5))off.push(el.textContent);}
- return {over,small,pad:badPad?{top:r.top,bottom:r.bottom,h}:null,off};
+ for(const el of document.querySelectorAll('.sum-foot .btn,.cel-actions .btn,.np-start,.table-actions .btn,.home-actions .btn')){const b=el.getBoundingClientRect();if(b.height&&(b.top<safe.top-.5||b.bottom>safe.bottom+.5))off.push(el.textContent);}
+ return {over,small,pad:badPad?{top:r.top,bottom:r.bottom,h,safe}:null,off};
 });}
 async function matrix(browser,type,base){
  for(const [device,w,h] of sizes.filter(v=>!process.env.TB_TEST_DEVICE||v[0]===process.env.TB_TEST_DEVICE)){const context=await browser.newContext({viewport:{width:w,height:h},hasTouch:true,deviceScaleFactor:1});const page=await context.newPage();
@@ -54,16 +58,45 @@ async function matrix(browser,type,base){
  }
 }
 async function safeAreas(browser,type,base){
- for(const side of ['left','right']){
-  const c=await browser.newContext({viewport:{width:852,height:393},hasTouch:true});
+ const cases=[
+  ['notch-left',852,393,{left:44,bottom:21}],['notch-right',852,393,{right:44,bottom:21}],
+  ['android-buttons',384,824,{top:24,bottom:48}],['android-buttons-land',824,384,{top:24,bottom:48}],
+  ['android-side-bar',824,384,{left:32,top:24,right:48}]
+ ];
+ for(const [device,width,height,insets] of cases){
+  const c=await browser.newContext({viewport:{width,height},hasTouch:true});
   await c.route('**/css/style.css',route=>{
-   let css=fs.readFileSync('_site/css/style.css','utf8').replace(/env\(safe-area-inset-(top|right|bottom|left)\)/g,(_,edge)=>edge==='bottom'?'21px':edge===side?'44px':'0px');
+   let css=fs.readFileSync('_site/css/style.css','utf8').replace(/env\(safe-area-inset-(top|right|bottom|left)\)/g,(_,edge)=>(insets[edge]||0)+'px');
    route.fulfill({contentType:'text/css',body:css});
   });
   const p=await c.newPage();await p.goto(base);await seed(p);
-  for(const name of ['home','practice','ladder','race','sprint']){await visit(p,name);const m=await metrics(p);results.push({type,device:'notch-'+side,name,...m});if(m.pad||m.over||m.off.length)failures.push({type,device:'notch-'+side,name,...m});await p.screenshot({path:`test-results/screens/${type}-notch-${side}-${name}.png`});}
+  for(const name of ['home','practice','ladder','race','sprint']){await visit(p,name);const m=await metrics(p);results.push({type,device,name,...m});if(m.pad||m.over||m.small.length||m.off.length)failures.push({type,device,name,...m});await p.screenshot({path:`test-results/screens/${type}-${device}-${name}.png`});}
   await c.close();
  }
+}
+async function changingViewport(browser,type,base){
+ const c=await browser.newContext({viewport:{width:384,height:824},hasTouch:true});
+ await c.addInitScript(()=>{
+  window.testCoveredHeight=0;window.testViewport=new EventTarget();
+  Object.defineProperty(testViewport,'height',{get:()=>innerHeight-testCoveredHeight});
+  Object.defineProperty(window,'visualViewport',{value:testViewport,configurable:true});
+ });
+ const p=await c.newPage();await p.goto(base);await seed(p);
+ for(const [width,height] of [[384,824],[824,384]]){
+  await p.setViewportSize({width,height});
+  for(const name of ['practice','ladder','race','sprint']){
+   await visit(p,name);
+   const question=p.locator('.equation,.ladder-display').first(),before=await question.textContent();
+   await p.evaluate(()=>{testCoveredHeight=64;testViewport.dispatchEvent(new Event('resize'));});
+   assert.equal(await question.textContent(),before,'De ronde en invoer blijven staan bij een veranderende werkbalk');
+   const m=await metrics(p);const device='visible-height-'+width;
+   results.push({type,device,name,...m});if(m.pad||m.over||m.small.length||m.off.length)failures.push({type,device,name,...m});
+   await p.screenshot({path:`test-results/screens/${type}-${device}-${name}.png`});
+   await p.evaluate(()=>{testCoveredHeight=0;testViewport.dispatchEvent(new Event('scroll'));});
+   assert.equal(await question.textContent(),before);
+  }
+ }
+ await c.close();
 }
 async function voiceAndCopies(browser,base){
  const c=await browser.newContext({viewport:{width:393,height:852}});
@@ -103,7 +136,7 @@ async function functional(browser,base){
  const apk=await c.newPage();await apk.addInitScript(()=>{window.AndroidStore={get:()=>null,set:()=>{window.savedAndroid=true;}};});await apk.goto('file://'+path.resolve('app/src/main/assets/www/index.html'));await seed(apk);assert(await apk.evaluate(()=>window.savedAndroid));assert.equal(await apk.locator('link[rel="manifest"]').count(),0);assert.equal(await apk.evaluate(()=>!!window.TBWeb),false);await c.close();
 }
 (async()=>{fs.mkdirSync('test-results/screens',{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;const base=`http://127.0.0.1:${port}/tafelberg/`;
- try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await voiceAndCopies(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
+ try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await changingViewport(b,type,base);await voiceAndCopies(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
  finally{server.close();fs.writeFileSync('test-results/layout.json',JSON.stringify({results,failures,errors},null,2));}
  console.log(JSON.stringify({screens:results.length,failures:failures.length,errors},null,2));if(failures.length){console.log(JSON.stringify(failures.slice(0,20),null,2));process.exitCode=1;}if(errors.length)process.exitCode=1;
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

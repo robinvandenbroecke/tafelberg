@@ -3,7 +3,7 @@
     <color name="sky">#EAF2F8</color>
     <color name="icon_background">#BBDDF3</color>
 
-    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar.Fullscreen">
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/sky</item>
         <item name="android:colorPrimary">#1F2A44</item>
         <item name="android:colorPrimaryDark">#1F2A44</item>

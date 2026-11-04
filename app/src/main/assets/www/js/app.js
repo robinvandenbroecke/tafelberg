@@ -242,11 +242,18 @@
   function applyTheme() { setHtmlClass('eink', einkOn()); }
 
   var lastLayout = null;
-  function isPort() { return (window.innerHeight || 0) >= (window.innerWidth || 0); }
+  function visibleHeight() {
+    var height = window.innerHeight || document.documentElement.clientHeight;
+    var viewport = window.visualViewport;
+    return Math.floor(viewport && viewport.height > 0 ? Math.min(height, viewport.height) : height);
+  }
+  function isPort() { return visibleHeight() >= (window.innerWidth || 0); }
 
   function fitRoot() {
     var w = window.innerWidth || document.documentElement.clientWidth;
-    var hh = window.innerHeight || document.documentElement.clientHeight;
+    var hh = visibleHeight();
+    // Ook oude WebViews zonder dvh en browsers met zichtbare werkbalk/toetsenbord.
+    root.style.height = hh + 'px';
     var phone = Math.min(w, hh) < 600;
     var base = phone ? Math.max(13, Math.min(18, Math.min(w, hh) / (w > hh ? 28 : 24))) : Math.max(11, Math.min(30, Math.min(w, hh) / 38));
     document.documentElement.style.fontSize = base.toFixed(2) + 'px';
@@ -3331,6 +3338,10 @@
     applyTheme();
     fitRoot();
     window.addEventListener('resize', fitRoot, false);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fitRoot, false);
+      window.visualViewport.addEventListener('scroll', fitRoot, false);
+    }
     window.addEventListener('orientationchange', function () { window.setTimeout(fitRoot, 200); }, false);
     document.addEventListener('contextmenu', function (e) { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); }, false);
     if (window.TBWeb) window.TBWeb.init(window.Tafelberg);
