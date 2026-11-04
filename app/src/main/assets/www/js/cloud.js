@@ -290,8 +290,8 @@
     }
     var submit = button(mode === 'register' ? 'Account maken' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden', function () {
       if (submit.disabled) return;
-      var u = email.input.value.toLowerCase().replace(/^\\s+|\\s+$/g, '');
-      if (u.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(u)) { status.textContent = 'Vul een geldig e-mailadres in.'; return; }
+      var u = email.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
+      if (u.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) { status.textContent = 'Vul een geldig e-mailadres in.'; return; }
       if (mode !== 'recover' && !pass.input.value.length) { status.textContent = 'Vul je wachtwoord in.'; return; }
       if (mode === 'register' && pass.input.value.length < 12) { status.textContent = 'Gebruik minstens 12 tekens.'; return; }
       var source = mode === 'register' ? firstSource.input.value || null : meta.pending[u] && meta.pending[u].source;

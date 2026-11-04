@@ -56,7 +56,7 @@ export function createHandler(config, fetcher = fetch) {
         const username = typeof input.username === 'string' ? input.username.trim().toLowerCase() : '';
         const byEmail = typeof input.email === 'string';
         const suppliedEmail = byEmail ? input.email.trim().toLowerCase() : '';
-        if (byEmail && (suppliedEmail.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(suppliedEmail))) return reply({ ok: false, message: 'Vul een geldig e-mailadres in.' }, 400);
+        if (byEmail && (suppliedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suppliedEmail))) return reply({ ok: false, message: 'Vul een geldig e-mailadres in.' }, 400);
         if ((!byEmail || action === 'register' && username) && (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(username) || ['constructor','prototype'].includes(username))) return reply({ ok: false, message: 'Gebruik 3 tot 30 letters, cijfers, - of _.' }, 400);
         if (!await limit(action + ':ip:' + ip, action === 'login' ? 30 : 5, action === 'login' ? 900 : 3600)
           || !await limit(action + ':identity:' + (byEmail ? suppliedEmail : username), action === 'login' ? 10 : 3, 900)) return reply({ ok: false, message: 'Te vaak geprobeerd. Probeer later opnieuw.' }, 429);
