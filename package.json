@@ -6,12 +6,14 @@
     "build:web": "node scripts/build-web.cjs",
     "check:es5": "node scripts/check-es5.cjs",
     "test:tables": "node tests/table-selection.cjs",
-    "test": "npm run test:tables && node tests/web.cjs && node tests/offline.cjs"
+    "test": "npm run test:tables && npm run test:cloud && node tests/web.cjs && node tests/offline.cjs",
+    "test:cloud": "node tests/supabase-db.cjs && node tests/supabase-edge.cjs && node tests/supabase-browser.cjs"
   },
   "keywords": [],
   "author": "",
   "type": "commonjs",
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
     "@playwright/test": "1.61.0",
     "acorn": "8.15.0",
     "qrcode": "1.5.4",

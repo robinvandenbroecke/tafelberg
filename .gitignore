@@ -20,3 +20,6 @@ playwright-report/
 
 *-run.log
 test-deps.log
+
+# Lokale Supabase CLI-status
+supabase/.temp/
