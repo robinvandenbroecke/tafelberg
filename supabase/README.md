@@ -4,13 +4,13 @@ Status: geconfigureerd en gecontroleerd voor publicatie. `cloud-config.js` bevat
 
 ## Wat de speler ziet
 
-Eén ouderaccount gebruikt een gebruikersnaam, wachtwoord (12–128 tekens) en herstel-e-mailadres. Het account kan maximaal 50 onafhankelijke klimmers bevatten. Kinderen hebben geen eigen e-mailadres nodig. Iedere klimmer heeft een eigen naam, tafelselectie, sterren, feiten en revisie. Na aanmelden worden alle accountklimmers opgehaald; de gebruiker kiest met wie hij speelt of maakt een nieuwe klimmer aan.
+Eén ouderaccount gebruikt uitsluitend een e-mailadres en wachtwoord (12–128 tekens). Aanmelden staat zichtbaar op het startscherm en bij het toevoegen of kiezen van een klimmer. Het account kan maximaal 50 onafhankelijke klimmers bevatten. Kinderen hebben geen eigen e-mailadres nodig. Iedere klimmer heeft een eigen naam, tafelselectie, sterren, feiten en revisie. Na aanmelden worden alle accountklimmers opgehaald; de gebruiker kiest met wie hij speelt of maakt een nieuwe klimmer aan.
 
-Wachtwoord vergeten is beschikbaar via een herstelmail. Gebruikersnaam vergeten en accountbeheer verlopen voorlopig via de projecteigenaar. E-maillinks moeten via de HTTPS-webapp worden geopend; de APK verwerkt nog geen Android-deeplinks. Daarna kan men met het nieuwe wachtwoord in de APK aanmelden.
+Wachtwoord vergeten is beschikbaar via een herstelmail. Accountbeheer verloopt voorlopig via de projecteigenaar. Oudere APK's kunnen hun bestaande gebruikersnaam nog gebruiken. E-maillinks moeten via de HTTPS-webapp worden geopend; de APK verwerkt nog geen Android-deeplinks. Daarna kan men met het nieuwe wachtwoord in de APK aanmelden.
 
 ### Bestaande lokale voortgang meenemen
 
-- Bij **Account maken** kiest de gebruiker bij **Voortgang bij account maken** eventueel een eerste lokale klimmer. De huidige losse klimmer staat vooraf geselecteerd. Tijdens e-mailbevestiging blijft alle voortgang lokaal beschikbaar; de keuze wordt per gebruikersnaam op dat toestel onthouden. Na bevestiging wordt deze klimmer aan het account toegevoegd.
+- Bij **Account maken** kiest de gebruiker bij **Voortgang bij account maken** eventueel een eerste lokale klimmer. De huidige losse klimmer staat vooraf geselecteerd. Tijdens e-mailbevestiging blijft alle voortgang lokaal beschikbaar; de keuze wordt per e-mailadres op dat toestel onthouden. Na bevestiging wordt deze klimmer aan het account toegevoegd.
 - Bij **Aanmelden met een bestaand account** wordt geen losse lokale voortgang automatisch geüpload. In het account kiest de gebruiker onder **Lokale voortgang meenemen** een bron en bij **Opslaan als** een nieuwe klimmer of dezelfde persoon die al in het account bestaat. Elke losse lokale klimmer kan afzonderlijk worden toegevoegd.
 - Bij koppelen aan een bestaande klimmer wordt de verste volledige versie behouden: sterren, daarna afgeronde rondes/races/sprints, daarna beheersing. Scores worden niet opgeteld. Staat de accountklimmer verder, dan blijft de minder ver gevorderde lokale bron apart bewaard. De gebruiker moet dus zelf dezelfde persoon kiezen; het systeem kan namen niet betrouwbaar koppelen.
 - Een lokale bron wordt pas vervangen na serverbevestiging en duurzame lokale opslag. Nieuwe klimmers krijgen een server-ID; een bewaarde aanvraag-ID voorkomt dubbele klimmers bij opnieuw verzenden na een verbindingsfout. Kinderen en accounts worden nooit op basis van een meegestuurde eigenaar gekoppeld.
@@ -18,7 +18,7 @@ Wachtwoord vergeten is beschikbaar via een herstelmail. Gebruikersnaam vergeten 
 
 ## Beheerd project activeren
 
-1. Maak een **gratis** Supabase-project voor Tafelberg aan, bij voorkeur Frankfurt (`eu-central-1`). Controleer de prijs vóór aanmaken. Gebruik dit project uitsluitend voor Tafelberg; de Auth-trigger reserveert voor iedere nieuwe gebruiker een Tafelberg-gebruikersnaam.
+1. Maak een **gratis** Supabase-project voor Tafelberg aan, bij voorkeur Frankfurt (`eu-central-1`). Controleer de prijs vóór aanmaken. Gebruik dit project uitsluitend voor Tafelberg; de Auth-trigger maakt voor iedere nieuwe gebruiker een interne accountsleutel.
 2. Controleer eerst bestaande tabellen. Pas daarna de SQL onder `migrations/` toe. De gebruikersnamen en limieten staan in `tafelberg_private`, buiten de Data API. Laat uitsluitend `public` in de Data API staan. Voortgang heeft RLS en alleen leesrechten voor de eigenaar; schrijven gaat via de gecontroleerde `tb_sync`-transactie.
 3. Stel Auth Site URL en toegestane redirect exact in op `https://robinvandenbroecke.github.io/tafelberg/`. Laat e-mailbevestiging aan; minimum wachtwoordlengte 12. Schakel anonieme accounts en ongebruikte providers uit. Behoud de standaardbeveiligingen en sessieverversing. Auth-rollen worden nooit uit gebruikersmetadata afgeleid.
 4. Configureer **eigen SMTP** voor verificatie en herstel. Supabase's standaardmailer is alleen bedoeld voor testadressen van de organisatie en is geen productiemaildienst. Gebruik een geverifieerd afzenderadres bij een mailprovider. Controleer verzendlimieten, ontvangst, spammap en herstel op een tweede toestel. Gebruik nooit de Gmail-koppeling van deze chat als maildienst voor de app. Zet SMTP-geheimen niet in GitHub.
@@ -64,3 +64,11 @@ Auth Site URL en de exacte redirect zijn ingesteld op `https://robinvandenbroeck
 Met een goedgekeurd tijdelijk account zijn de echte diensten gecontroleerd. Supabase verzond de registratie- en herstelmail; Brevo bevestigt beide als **Delivered**. Aanmelden vóór e-mailbevestiging wordt geweigerd. Na bevestiging via de ontvangen link slagen aanmelding met gebruikersnaam en wachtwoord, twee onafhankelijke klimmers, bescherming tegen oudere uploads, sessieverversing, wachtwoordwijziging (oud wachtwoord geweigerd, nieuw wachtwoord geaccepteerd) en afmelden (refreshsessie ingetrokken). De verzending van de herstelmail is echt getest; het openen van de herstelpagina is daarnaast in de browsertests gecontroleerd.
 
 Het tijdelijke account, de twee testklimmers, de resterende testsessies en de lokale tijdelijke testcredentials zijn verwijderd. De databasecontrole bevestigt nul achtergebleven testgebruikers, testprofielen en testsessies. Het publieke functieadres is nu ingevuld voor activering van de online-knoppen. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
+
+## Google, Apple en Facebook
+
+Deze providers zijn nog niet geconfigureerd. De app toont daarom geen inactieve aanmeldknoppen. Voor activering zijn OAuth-apps en providergeheimen nodig: Google Cloud (client-ID en secret), Apple Developer (Services ID en signing key) en Meta Developers (app-ID en secret). Configureer deze uitsluitend bij de provider en in Supabase Auth; zet geen providergeheimen in de webapp of GitHub.
+
+De callback bij iedere provider is `https://sjzbgdhxtibnbyutlyas.supabase.co/auth/v1/callback`. De HTTPS-webapp moet een gecontroleerde OAuth-callback met PKCE krijgen voordat knoppen worden aangezet. Voor de APK is daarnaast een veilige browser/deeplinkterugkeer nodig; de huidige WebView staat externe navigatie niet toe. Apple Sign in vereist een Apple Developer-account. Koppel accounts nooit zelf op basis van een onbevestigd e-mailadres.
+
+Migratie 004 laat registratie zonder gebruikersnaam toe. De interne sleutel blijft privé, bestaande account-ID's, klimmers, sessies en RLS blijven behouden. De Edge Function accepteert e-mail rechtstreeks voor aanmelden en herstel en geeft het geverifieerde Auth-e-mailadres terug voor de accountweergave.

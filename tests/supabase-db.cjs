@@ -26,6 +26,10 @@ async function fixture(){
 function profile(stars=0,rounds=0,b=0){return {id:'plocal',name:'Alice',color:0,created:0,settings:{tables:[5,10],excludedTables:[2],len:12,pace:'gewoon'},stats:{stars,rounds},facts:{'3x5':{b,n:1,c:1,due:0,last:0,rt:1500}}};}
 async function test(){
  const {db,as,sync,playerSync,list,create}=await fixture();try{
+ const C='33333333-3333-4333-8333-333333333333';
+ await db.query("insert into auth.users values($1,'email-only@example.test','{}')",[C]);
+ assert.equal((await list(C)).profiles.length,0,'Account zonder gebruikersnaam wordt bruikbaar');
+ assert.equal((await create(C,profile(4))).profile.stats.stars,4);
  let r=await sync(A,profile(15));assert.equal(r.profile.stats.stars,15);assert.equal(r.revision,1);assert.match(r.user,/^p[a-f0-9]{32}$/);const aliceId=r.user;
  let bob=await sync(B,profile(2));assert.equal(bob.profile.stats.stars,2);
  assert.equal((await as(A,'select * from public.tafelberg_progress')).rows.length,1);

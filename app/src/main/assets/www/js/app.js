@@ -1179,6 +1179,7 @@
         h('div', { class: 'bar-side bar-right' }, right)
       ]),
       window.TBWeb ? h('div', { class: 'web-notices' }) : null,
+      cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'),
       rangeEl,
       h('div', { class: 'home-actions' }, [
         h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
@@ -1261,7 +1262,7 @@
     root.appendChild(h('div', { class: 'screen who' }, [
       topBar(current.back ? iconButton('back', 'Terug', current.back) : null,
         h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), null),
-      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cards, cloudButton('Online speler toevoegen', { mode: 'login' })]),
+      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'), cards]),
       decoRange()
     ]));
   };
@@ -1297,9 +1298,10 @@
     drawPreview();
 
     root.appendChild(h('div', { class: 'screen newplayer' }, [
-      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), window.TBCloud && window.TBCloud.configured() ? h('button', { class: 'btn cloud-entry', 'aria-label': 'Online speler toevoegen', onclick: function () { go('cloud', { mode: 'login' }); } }, '☁') : null),
+      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), null),
       h('div', { class: 'np-main' }, [
         h('div', { class: 'np-card' }, [
+          cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'),
           first ? h('p', { class: 'np-intro' }, 'Elke tafel is een berg. Wie de sommen vlot kent, klimt naar de top.') : null,
           h('div', { class: 'np-row' }, [
             preview,

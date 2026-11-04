@@ -26,7 +26,10 @@ export function createHandler(config, fetcher = fetch) {
   }
   async function list(token) {
     const r = await call('/rest/v1/rpc/tb_list_profiles', {}, token);
-    return r.ok ? r.data : { ok: false, authExpired: r.status === 401, message: 'Klimmers ophalen lukt nu niet.' };
+    if (!r.ok) return { ok: false, authExpired: r.status === 401, message: 'Klimmers ophalen lukt nu niet.' };
+    const user = await call('/auth/v1/user', null, token, false, 'GET');
+    if (!user.ok) return { ok: false, authExpired: true, message: 'Meld je opnieuw aan.' };
+    return { ...r.data, email: user.data.email || '' };
   }
   return async function handler(req) {
     const requestOrigin = req.headers.get('origin');
@@ -51,29 +54,33 @@ export function createHandler(config, fetcher = fetch) {
       if (!await limit('ip:' + ip, 120, 60)) return reply({ ok: false, message: 'Even wachten en opnieuw proberen.' }, 429);
       if (['register','login','recover'].includes(action)) {
         const username = typeof input.username === 'string' ? input.username.trim().toLowerCase() : '';
-        if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(username) || ['constructor','prototype'].includes(username)) return reply({ ok: false, message: 'Gebruik 3 tot 30 letters, cijfers, - of _.' }, 400);
+        const byEmail = typeof input.email === 'string';
+        const suppliedEmail = byEmail ? input.email.trim().toLowerCase() : '';
+        if (byEmail && (suppliedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suppliedEmail))) return reply({ ok: false, message: 'Vul een geldig e-mailadres in.' }, 400);
+        if ((!byEmail || action === 'register' && username) && (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(username) || ['constructor','prototype'].includes(username))) return reply({ ok: false, message: 'Gebruik 3 tot 30 letters, cijfers, - of _.' }, 400);
         if (!await limit(action + ':ip:' + ip, action === 'login' ? 30 : 5, action === 'login' ? 900 : 3600)
-          || !await limit(action + ':name:' + username, action === 'login' ? 10 : 3, 900)) return reply({ ok: false, message: 'Te vaak geprobeerd. Probeer later opnieuw.' }, 429);
+          || !await limit(action + ':identity:' + (byEmail ? suppliedEmail : username), action === 'login' ? 10 : 3, 900)) return reply({ ok: false, message: 'Te vaak geprobeerd. Probeer later opnieuw.' }, 429);
         if (action !== 'recover' && (typeof input.password !== 'string' || input.password.length < (action === 'register' ? 12 : 1) || input.password.length > 128)) return reply({ ok: false, message: 'Gebruik een wachtwoord van 12 tot 128 tekens.' }, 400);
         if (action === 'register') {
-          const email = typeof input.email === 'string' ? input.email.trim() : '';
-          if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply({ ok: false, message: 'Vul een geldig herstel-e-mailadres in.' }, 400);
+          const email = suppliedEmail;
+          if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply({ ok: false, message: 'Vul een geldig e-mailadres in.' }, 400);
           const r = await call('/auth/v1/signup?redirect_to=' + encodeURIComponent(site), {
-            email, password: input.password, data: { username }, ...(input.captcha ? { gotrue_meta_security: { captcha_token: input.captcha } } : {})
+            email, password: input.password, data: username ? { username } : {}, ...(input.captcha ? { gotrue_meta_security: { captcha_token: input.captcha } } : {})
           });
           if (!r.ok) return reply({ ok: false, message: 'Account maken lukt niet. Controleer de gegevens of kies Aanmelden als je al een account hebt.' });
-          if (!r.data.access_token) return reply({ ok: true, confirmation: true, message: 'Controleer je e-mail en bevestig je account. Meld je daarna aan om deze voortgang te koppelen.' });
+          if (!r.data.access_token) return reply({ ok: true, confirmation: true, message: 'Bevestig je account via de e-mail. Meld je daarna aan.' });
           return reply({ ...await list(r.data.access_token), ...session(r.data) });
         }
-        const lookup = await call('/rest/v1/rpc/tb_lookup_username', { wanted: username }, null, true);
-        const email = lookup.ok && typeof lookup.data === 'string' ? lookup.data : null;
+        // Oudere APK's blijven tijdelijk ook met hun bestaande gebruikersnaam werken.
+        const lookup = byEmail ? null : await call('/rest/v1/rpc/tb_lookup_username', { wanted: username }, null, true);
+        const email = byEmail ? suppliedEmail : lookup.ok && typeof lookup.data === 'string' ? lookup.data : null;
         if (action === 'recover') {
           if (email) await call('/auth/v1/recover?redirect_to=' + encodeURIComponent(site), { email });
-          return reply({ ok: true, message: 'Als dit account bestaat, wordt een herstelmail verstuurd. Controleer ook je spammap.' });
+          return reply({ ok: true, message: 'Als dit account bestaat, ontvang je een herstelmail.' });
         }
         // Ook onbekende gebruikers door Auth laten controleren; de fout blijft gelijk.
         const r = await call('/auth/v1/token?grant_type=password', { email: email || 'unknown-' + crypto.randomUUID() + '@invalid.example', password: input.password });
-        if (!r.ok || !email) return reply({ ok: false, message: 'Aanmelden lukt niet. Controleer gebruikersnaam, wachtwoord en e-mailbevestiging.' });
+        if (!r.ok || !email) return reply({ ok: false, message: 'Aanmelden lukt niet. Controleer e-mailadres, wachtwoord en e-mailbevestiging.' });
         return reply({ ...await list(r.data.access_token), ...session(r.data) });
       }
       if (action === 'refresh') {
