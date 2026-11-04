@@ -160,7 +160,7 @@ Maak de repository publiek en kies bij **Settings → Pages → Build and deploy
 
 Open het spel één keer met internet en wacht tot de eerste offline-cache klaar is. Daarna werken het spel, de lettertypen, de installatiepagina en aanwezige opnames zonder internet. De browser kan opslag alsnog wissen bij ruimtegebrek of na het wissen van websitegegevens. De app vraagt waar mogelijk om blijvende opslag; dat is geen garantie.
 
-Een nieuwe versie wacht op de achtergrond. Alleen op het startscherm verschijnt **Er is een nieuwe versie. Tik om bij te werken.** De app slaat eerst de voortgang op en herlaadt pas na die tik. Een ronde wordt niet automatisch herstart. In andere open vensters wordt evenmin midden in een ronde herladen; open die later opnieuw om de nieuwe code te laden.
+Een nieuwe versie wordt automatisch geladen zodra het startscherm zichtbaar is. De app slaat eerst de voortgang op. Tijdens een ronde of op een ander scherm wacht de update; ook andere open vensters herladen pas op hun startscherm. Bij terugkeer naar de app of herstel van internet wordt opnieuw naar updates gezocht, maximaal eenmaal per minuut. Vanaf een oudere versie met handmatige updates moet je nog één keer op de bestaande updatemelding tikken om deze automatische werkwijze te krijgen.
 
 ### Voortgang per toestel en kopieën
 
@@ -193,7 +193,7 @@ npm test
 - **iPhone:** installeren via delen; via het icoon openen; daarna vliegtuigmodus en opnieuw openen. Geluid na de eerste tik, Nederlandse stem van Mo, notch/thuisbalk staand en liggend (beide kanten) controleren. Kopie uit Safari in de beginschermapp terugzetten.
 - **iPad:** installeren; staand, liggend, Split View en Slide Over; toetsen en onderbalk mogen niet achter systeemranden vallen.
 - **Android-telefoon:** installatieknop plus systeembevestiging; offline openen; teruggebaar vanuit oefenen naar de tafel en naar huis; trillen aan/uit in Instellingen.
-- **Updates:** een ronde open laten terwijl een nieuwe versie wordt gepubliceerd; er mag niets herstarten. Terug naar huis, op de updatemelding tikken en voortgang controleren. Herhalen met twee vensters.
+- **Updates:** een ronde open laten terwijl een nieuwe versie wordt gepubliceerd; er mag niets herstarten. Terug naar huis: de app moet automatisch bijwerken en voortgang behouden. Herhalen met twee vensters; elk venster wacht tot zijn eigen startscherm zichtbaar is.
 - **Galaxy Tab S3 en Boox:** APK starten, spelen, voortgang bewaren, Android-terugknop en spraak controleren; Boox moet de bestaande e-inkweergave behouden. Dit vraagt een echt toestel.
 - **Opnames en spraak:** echte Safari-audiotoestemming, geïnstalleerde Nederlandse stemmen en eventuele ontbrekende mp3's controleren. Browseremulatie kan dit niet volledig bewijzen.
 

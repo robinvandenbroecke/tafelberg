@@ -20,7 +20,7 @@ const server=https.createServer({key:fs.readFileSync('test-results/tls/key.pem')
  const b=await engine.launch(launch);try{
  const c=await b.newContext({ignoreHTTPSErrors:true,viewport:{width:393,height:852}}),p=await c.newPage();
  console.log(name+': starten');await p.goto(base);await p.getByRole('textbox',{name:'Naam',exact:true}).fill('Offline');await p.getByRole('button',{name:'Start de klim'}).click();
- await p.evaluate(()=>{Tafelberg.profile().settings.voice=false;Tafelberg.profile().settings.sound=false;Tafelberg.save();});
+ await p.evaluate(()=>{Tafelberg.profile().settings.voice=false;Tafelberg.profile().settings.sound=false;Tafelberg.profile().stats.stars=37;Tafelberg.save();});
  await p.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));await p.waitForFunction(()=>!!navigator.serviceWorker.controller);
  // WebKit setOffline breekt SW-navigaties (Playwright #42775). Maak de echte server onbereikbaar.
  // Chromium gebruikt daarnaast de gevraagde browseremulatie van vliegtuigmodus.
@@ -35,17 +35,26 @@ const server=https.createServer({key:fs.readFileSync('test-results/tls/key.pem')
  await p.evaluate(()=>navigator.serviceWorker.getRegistration().then(r=>r.update()));
  await p.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r.waiting));
  assert.equal(await p.locator('.web-update').count(),0);assert.equal(await p.locator('.equation').textContent(),primary);
- await p.evaluate(()=>Tafelberg.go('home'));
- await Promise.all([p.waitForEvent('load'),p.getByRole('button',{name:'Er is een nieuwe versie. Tik om bij te werken.'}).click()]);
+ await Promise.all([p.waitForEvent('load'),p.evaluate(()=>Tafelberg.go('home'))]);
  assert(await p.getByText('Dag Offline!',{exact:true}).isVisible());assert.equal(await other.locator('.equation').textContent(),equation);
+ // Het andere venster heeft de nieuwe worker, maar bewaart zijn ronde tot thuiskomst.
+ await Promise.all([other.waitForEvent('load'),other.evaluate(()=>Tafelberg.go('home'))]);
+ assert(await other.getByText('Dag Offline!',{exact:true}).isVisible());
  const caches=await p.evaluate(()=>window.caches.keys());assert.deepEqual(caches.filter(x=>x.startsWith('tafelberg-')),['tafelberg-test-next']);
+ assert.equal(await p.evaluate(()=>Tafelberg.profile().stats.stars),37);
+ // Ook bij een update die pas op het startscherm aankomt is geen tik nodig.
+ fs.writeFileSync(swPath,original.replace(/var VERSION = [^;]+;/,'var VERSION = "test-home";'));
+ await Promise.all([p.waitForEvent('load'),other.waitForEvent('load'),p.evaluate(()=>navigator.serviceWorker.getRegistration().then(r=>r.update()))]);
+ assert.equal(await p.evaluate(()=>Tafelberg.profile().stats.stars),37);
+ assert.equal(await other.evaluate(()=>Tafelberg.profile().stats.stars),37);
+ assert.deepEqual((await p.evaluate(()=>window.caches.keys())).filter(x=>x.startsWith('tafelberg-')),['tafelberg-test-home']);
  const manifest=await p.evaluate(()=>fetch('manifest.webmanifest').then(r=>r.json()));assert.equal(manifest.display,'standalone');assert.equal(manifest.start_url,'./?bron=app');assert.equal(manifest.icons.length,3);
  if(name==='chromium'){
   const devtools=await c.newCDPSession(p);const install=await devtools.send('Page.getInstallabilityErrors');
   assert.deepEqual(install.installabilityErrors,[],JSON.stringify(install));await devtools.detach();
  }
  const png=await p.evaluate(()=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve([img.width,img.height]);img.onerror=reject;img.src='icons/maskable-512.png';}));assert.deepEqual(png,[512,512]);
- reports.push({engine:name,offlineMode:name==='webkit'?'origin-unreachable':'browser-offline-and-origin-unreachable',offline:true,missingAudioTolerated:true,waitingUpdate:true,noMidRoundReload:true,multipleTabs:true,manifest:true,installability:name==='chromium'?'no-errors':'manual-device-installation'});await c.close();
+ reports.push({engine:name,offlineMode:name==='webkit'?'origin-unreachable':'browser-offline-and-origin-unreachable',offline:true,missingAudioTolerated:true,waitingUpdate:true,automaticUpdate:true,noMidRoundReload:true,multipleTabs:true,manifest:true,installability:name==='chromium'?'no-errors':'manual-device-installation'});await c.close();
  }finally{await b.close();}
  }}finally{fs.writeFileSync(swPath,original);server.close();try{fs.rmSync('test-results/tls',{recursive:true});}catch(e){}fs.writeFileSync('test-results/offline.json',JSON.stringify(reports,null,2));}
  console.log(JSON.stringify(reports,null,2));

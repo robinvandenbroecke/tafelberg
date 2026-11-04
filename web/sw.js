@@ -1,4 +1,4 @@
-/* De bouwstraat vult versie en bestanden in. Updates wachten op een bewuste tik. */
+/* De bouwstraat vult versie en bestanden in. De app activeert updates op haar startscherm. */
 var VERSION = __VERSION__;
 var FILES = __FILES__;
 var CACHE = 'tafelberg-' + VERSION;
