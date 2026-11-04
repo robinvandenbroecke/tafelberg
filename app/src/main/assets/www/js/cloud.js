@@ -29,7 +29,7 @@
   function schedule() { if (timer) window.clearTimeout(timer); timer = window.setTimeout(sync, 2500); }
   function note(account, message) {
     if (meta.sessions[account]) meta.sessions[account].message = message;
-    if (ui && ui.account === account) ui.note.textContent = message;
+    if (ui && ui.mode === 'account' && ui.account === account) ui.note.textContent = message;
   }
   function finish(id, result) { var p = pending[id]; if (!p) return; delete pending[id]; window.clearTimeout(p.timeout); p.callback(result); }
   function raw(request, callback) {
@@ -84,7 +84,7 @@
     for (var i = 0; i < result.profiles.length; i++) install(result.profiles[i], account, false);
     meta.sessions[account].checked = Date.now(); persist();
   }
-  function redraw(account) { if (api.current().name === 'cloud' && ui && ui.account === account) show(document.getElementById('app'), { mode: 'account', account: account, cached: true }); }
+  function redraw(account) { if (api.current().name === 'cloud' && ui && ui.mode === 'account' && ui.account === account) show(document.getElementById('app'), { mode: 'account', account: account, cached: true }); }
   function refreshAccount(account) {
     var session = meta.sessions[account]; if (!session || busy) return;
     busy = true; note(account, 'Klimmers ophalen…');
@@ -213,7 +213,7 @@
     s = account && meta.sessions[account];
     var mode = params.mode || (s ? 'account' : current ? 'register' : 'login');
     var content = h('div', { class: 'cloud-card' }), status = h('p', { class: 'set-note', role: 'status' });
-    ui = { account: account, note: status };
+    ui = { account: account, mode: mode, note: status };
     root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'settings' : 'newPlayer'); }), h('h1', null, 'Online bewaren')]), h('div', { class: 'cloud-main' }, content)]));
     if (!configured()) { content.appendChild(h('p', null, 'Online bewaren is nog niet beschikbaar. Je voortgang blijft op dit toestel.')); return; }
     if (mode === 'account' && s) {

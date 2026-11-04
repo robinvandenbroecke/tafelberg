@@ -21,7 +21,7 @@ async function main(){
     const data=route.request().postDataJSON();
     const response=await b.handler(new Request(endpoint,{method:'POST',headers:{Origin:'https://robinvandenbroecke.github.io','Content-Type':'application/json'},body:JSON.stringify(data)}));
     const result=await response.text();const deliver=()=>route.fulfill({status:response.status,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:result});
-    if(hold&&data.action==='write'){hold.deliver=deliver;return;}
+    if(hold&&data.action===(hold.action||'write')){hold.deliver=deliver;return;}
     await deliver();
    });
    await p.addInitScript(()=>{window.completedCloud=0;const send=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){this.addEventListener('loadend',()=>window.completedCloud++);return send.apply(this,arguments);};});
@@ -88,7 +88,12 @@ async function main(){
   assert.equal(await a.p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.deepEqual(await a.p.locator('.cloud button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width<44||r.height<44;}).map(e=>e.textContent)),[]);
   fs.mkdirSync('test-results/screens',{recursive:true});await a.p.screenshot({path:'test-results/screens/supabase-family-account.png'});
-  await a.p.evaluate(()=>Tafelberg.go('cloud',{mode:'recover'}));await a.p.getByRole('textbox',{name:'Gebruikersnaam',exact:true}).fill('alice');await a.p.getByRole('button',{name:'Herstelmail versturen',exact:true}).click();await a.p.getByRole('status').filter({hasText:'Als dit account bestaat'}).waitFor();
+  // Een vertraagde accountlijst mag een geopend herstel-/aanmeldformulier niet vervangen.
+  hold={action:'list'};await a.p.evaluate(()=>Tafelberg.go('cloud'));
+  for(let i=0;i<100&&!hold.deliver;i++)await new Promise(r=>setTimeout(r,20));assert(hold.deliver);
+  await a.p.evaluate(()=>Tafelberg.go('cloud',{mode:'recover'}));
+  const beforeRecovery=await a.p.evaluate(()=>window.completedCloud);await hold.deliver();hold=null;await a.p.waitForFunction(n=>window.completedCloud>n,beforeRecovery);
+  await a.p.getByRole('heading',{name:'Wachtwoord vergeten',exact:true}).waitFor();await a.p.getByRole('textbox',{name:'Gebruikersnaam',exact:true}).fill('alice');await a.p.getByRole('button',{name:'Herstelmail versturen',exact:true}).click();await a.p.getByRole('status').filter({hasText:'Als dit account bestaat'}).waitFor();
   // Aanmelden doet op zichzelf geen upload. De gebruiker kiest de lokale bron en het kind.
   const e=await device();await local(e.p,'Lokale Alice',80);await form(e.p,'login','alice','Alice-password-123');
   assert.equal((await b.rpc({action:'login',username:'alice',password:'Alice-password-123'})).data.profiles.find(p=>p.user===hector).profile.stats.stars,50);
