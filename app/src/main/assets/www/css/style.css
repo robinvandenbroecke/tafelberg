@@ -597,8 +597,8 @@ button:focus-visible { outline: 0.2rem solid #2F6FD0; outline-offset: 0.15rem; }
 .deco .range-svg { display: block; width: 100%; height: auto; }
 
 /* ---------- nieuwe speler */
-.np-main { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; overflow-y: auto; padding: 0.4rem 0; }
-.np-card { width: 40rem; max-width: 100%; background: #FFFFFF; border-radius: 1.6rem; border: 0.12rem solid #D9E4EE; padding: 1.2rem 1.5rem 1.4rem; }
+.np-main { flex: 1 1 auto; display: flex; align-items: flex-start; justify-content: center; min-height: 0; overflow-y: auto; padding: 0.4rem 0; }
+.np-card { width: 40rem; max-width: 100%; margin-top: auto; margin-bottom: auto; background: #FFFFFF; border-radius: 1.6rem; border: 0.12rem solid #D9E4EE; padding: 1.2rem 1.5rem 1.4rem; }
 .np-intro { font-size: 1.15rem; margin-bottom: 0.9rem; }
 .np-row { display: flex; align-items: center; margin-bottom: 0.9rem; }
 .np-preview { margin-right: 1.1rem; }
@@ -1516,12 +1516,13 @@ html.phone .np-start { min-height: 48px; }
 /* Liggende telefoons: grote toetsen rechts, sommen links. */
 html.phone.land .practice-main { flex-direction: row; }
 html.phone.land .padzone { width: 45%; max-width: 380px; margin: 0 0 0 8px; }
-html.phone.land .key { height: calc((100vh - 75px) / 4 - 6px); height: calc((100dvh - 75px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 4 - 6px); min-height: 44px; max-height: 76px; margin: 3px 1%; font-size: 1.8rem; }
+html.phone.land .padzone { align-items: stretch; }
+html.phone.land .keypad { flex: 1 1 0; min-height: 0; align-content: stretch; }
+html.phone.land .key { height: calc(25% - 4px); min-height: 44px; max-height: 76px; margin: 2px 1%; font-size: 1.8rem; }
 html.phone.land .equation { font-size: 2.6rem; margin: 4px 0; }
 html.phone.land .ladder-side { width: 48%; margin: 0; }
-html.phone.land .ladder .key { height: calc((100vh - 150px) / 4 - 6px); height: calc((100dvh - 150px) / 4 - 6px); min-height: 44px; }
-html.phone.land .ladder-msg { min-height: 30px; font-size: 0.8rem; }
-html.phone.land .ladder-display { min-height: 30px; height: 32px; line-height: 28px; }
+html.phone.land .ladder-msg { min-height: 24px; padding: 2px; font-size: 0.8rem; }
+html.phone.land .ladder-display { min-height: 28px; height: 28px; line-height: 24px; margin: 2px 1%; }
 html.phone.land .ladder-main { flex-direction: row; }
 html.phone.land .hello { position: relative; top: 0; left: 0; padding: 4px 12px; }
 html.phone.land .hello h1 { font-size: 1.3rem; }
