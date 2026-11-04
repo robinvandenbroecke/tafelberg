@@ -29,14 +29,22 @@ public class SafeAreaTest {
     private ActivityController<MainActivity> controller;
     private MainActivity activity;
     private FrameLayout content;
-    private WebView web;
+    private View webSlot;
 
     @Before public void start() {
         // Niet attachen: de gesimuleerde ViewRoot zou de ingespoten insets door nul vervangen.
         controller = Robolectric.buildActivity(MainActivity.class).create();
         activity = controller.get();
         content = (FrameLayout) ((ViewGroup) activity.findViewById(android.R.id.content)).getChildAt(0);
-        web = (WebView) content.getChildAt(0);
+        WebView web = (WebView) content.getChildAt(0);
+        FrameLayout.LayoutParams slot = (FrameLayout.LayoutParams) web.getLayoutParams();
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, slot.width);
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, slot.height);
+        // Robolectric heeft geen Chromium-layoutprovider. Meet dezelfde MATCH_PARENT-plek
+        // met een gewone platform-View; de echte WebView blijft door de Activity beheerd.
+        content.removeView(web);
+        webSlot = new View(activity);
+        content.addView(webSlot, slot);
     }
 
     @After public void stop() { if (controller != null) controller.destroy(); }
@@ -64,9 +72,9 @@ public class SafeAreaTest {
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 48));
         assertEquals(24, content.getPaddingTop());
         layout(384, 824);
-        assertEquals(24, web.getTop());
-        assertEquals(776, web.getBottom());
-        assertEquals(752, web.getHeight());
+        assertEquals(24, webSlot.getTop());
+        assertEquals(776, webSlot.getBottom());
+        assertEquals(752, webSlot.getHeight());
         assertEquals(0, activity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN);
         assertEquals(0, activity.getWindow().getDecorView().getSystemUiVisibility()
                 & (View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION));
@@ -76,13 +84,13 @@ public class SafeAreaTest {
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 48));
         content.dispatchApplyWindowInsets(bars(32, 24, 48, 0));
         layout(824, 384);
-        assertEquals(32, web.getLeft());
-        assertEquals(776, web.getRight());
-        assertEquals(384, web.getBottom());
+        assertEquals(32, webSlot.getLeft());
+        assertEquals(776, webSlot.getRight());
+        assertEquals(384, webSlot.getBottom());
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 24));
         layout(384, 824);
-        assertEquals(0, web.getLeft());
-        assertEquals(800, web.getBottom());
+        assertEquals(0, webSlot.getLeft());
+        assertEquals(800, webSlot.getBottom());
     }
 
     @Test @Config(sdk = 35) public void keyboardAndCutoutUseLargestInsetAndAreConsumed() {
@@ -93,11 +101,11 @@ public class SafeAreaTest {
                 .setVisible(WindowInsets.Type.ime(), true).build();
         assertTrue(content.dispatchApplyWindowInsets(keyboard).isConsumed());
         layout(384, 824);
-        assertEquals(32, web.getLeft());
-        assertEquals(524, web.getBottom());
+        assertEquals(32, webSlot.getLeft());
+        assertEquals(524, webSlot.getBottom());
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 48));
         layout(384, 824);
-        assertEquals(0, web.getLeft());
-        assertEquals(776, web.getBottom());
+        assertEquals(0, webSlot.getLeft());
+        assertEquals(776, webSlot.getBottom());
     }
 }
