@@ -46,3 +46,9 @@ Gratis projecten kunnen na ongeveer een week met weinig activiteit worden gepauz
 - Browser: overzetten van een lokale klimmer, bevestiging, twee spelers en twee toestellen, offline wijzigingen, uitgesteld toepassen tijdens een ronde, herstel-link en sessies buiten de voortgangskopie.
 - `npm test`: bovendien bestaande tafelselectie-, scherm- en offline-/updatetests.
 - `.github/workflows/controle.yml`: Chromium + WebKit en een Android-debugbuild op een pull request, zonder signeersleutel en zonder publicatie.
+
+## Ingerichte infrastructuur (4 november 2026)
+
+Project `tafelberg` (`sjzbgdhxtibnbyutlyas`) is aangemaakt in de organisatie Tafelberg, Frankfurt, tegen de bevestigde prijs van €0/maand. De twee migraties zijn toegepast en Edge Function `tafelberg` versie 1 is actief. Een transactie met twee tijdelijke testaccounts bevestigt op de echte database dat de ingelogde gebruiker alleen zijn eigen profiel ziet en dat anoniem synchroniseren niet mag; de transactie is teruggedraaid. De Security Advisor meldt geen waarschuwingen na het verplaatsen van de schrijfimplementatie naar het privéschema. De publieke wrapper heeft geen verhoogde privileges.
+
+Auth-redirects, minimum wachtwoordlengte, SMTP en echte Auth-/mailtests moeten nog worden afgerond via het dashboard. Het publieke functieadres wordt pas daarna ingevuld; de online-knoppen zijn dus nog niet geactiveerd in de app. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
