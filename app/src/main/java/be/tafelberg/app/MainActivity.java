@@ -133,6 +133,8 @@ public class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     private void configureSystemBars(int background) {
         Window window = getWindow();
+        // PhoneWindow heeft zijn DecorView nodig voordat de inset-controller wordt opgevraagd.
+        View decor = window.getDecorView();
         window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Build.VERSION.SDK_INT >= 23 ? background : Color.rgb(0x1F, 0x2A, 0x44));
@@ -151,7 +153,7 @@ public class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             if (Build.VERSION.SDK_INT >= 23) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             if (Build.VERSION.SDK_INT >= 26) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            window.getDecorView().setSystemUiVisibility(flags);
+            decor.setSystemUiVisibility(flags);
         }
     }
 

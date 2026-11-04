@@ -32,13 +32,14 @@ public class SafeAreaTest {
     private WebView web;
 
     @Before public void start() {
-        controller = Robolectric.buildActivity(MainActivity.class).setup();
+        // Niet attachen: de gesimuleerde ViewRoot zou de ingespoten insets door nul vervangen.
+        controller = Robolectric.buildActivity(MainActivity.class).create();
         activity = controller.get();
         content = (FrameLayout) ((ViewGroup) activity.findViewById(android.R.id.content)).getChildAt(0);
         web = (WebView) content.getChildAt(0);
     }
 
-    @After public void stop() { controller.pause().stop().destroy(); }
+    @After public void stop() { if (controller != null) controller.destroy(); }
 
     @SuppressWarnings("deprecation")
     private WindowInsets bars(int left, int top, int right, int bottom) {
@@ -61,6 +62,7 @@ public class SafeAreaTest {
     @Test public void threeButtonNavigationIsOutsideWebViewWithoutDoublePadding() {
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 48));
         content.dispatchApplyWindowInsets(bars(0, 24, 0, 48));
+        assertEquals(24, content.getPaddingTop());
         layout(384, 824);
         assertEquals(24, web.getTop());
         assertEquals(776, web.getBottom());
