@@ -10,7 +10,8 @@ async function backend(){
   const u=new URL(url),data=opts.body?JSON.parse(opts.body):null,token=opts.headers.Authorization.replace(/^Bearer /,'');authCalls.push({path:u.pathname,admin:opts.headers.apikey==='server-secret'});
   if(u.pathname==='/auth/v1/signup'){
    if(users[data.email])return response({message:'exists'},400);
-   const id=data.data.username==='alice'?A:B;
+   const id=data.data.username==='alice'?A:data.data.username==='bob'?B:crypto.randomUUID();
+   if(id!==A&&id!==B)await f.db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3::jsonb)',[id,data.email,JSON.stringify(data.data)]);
    const user={id,email:data.email,password:data.password};users[data.email]=user;
    return response(settings.confirmation?{user:{id:user.id}}:session(user));
   }
@@ -31,10 +32,14 @@ async function backend(){
   if(u.pathname==='/rest/v1/rpc/tb_lookup_username'){
    assert.equal(opts.headers.apikey,'server-secret');const r=await f.db.query('select public.tb_lookup_username($1) as email',[data.wanted]);return response(r.rows[0].email);
   }
+  if(u.pathname==='/rest/v1/rpc/tb_list_profiles'){
+   assert.equal(opts.headers.apikey,'public-key');const user=tokens[token];if(!user)return response({},401);
+   return response(await f.list(user.id));
+  }
   if(u.pathname==='/rest/v1/rpc/tb_sync'){
    assert.equal(opts.headers.apikey,'public-key','Voortgang gebruikt de gebruikerssessie, niet de beheersleutel');
    const user=tokens[token];if(!user)return response({},401);
-   try{return response(await f.sync(user.id,data.candidate,data.base_revision));}catch{return response({},400);}
+   try{return response(await f.playerSync(user.id,data.candidate,data.base_revision,data.requested_profile,data.create_new,data.request_key));}catch{return response({},400);}
   }
   throw Error('Onverwacht verzoek: '+u.pathname);
  }
@@ -50,15 +55,21 @@ async function backend(){
 async function test(){
  const b=await backend();try{
  const {profile}=require('./supabase-db.cjs');
- let r=await b.rpc({action:'register',username:'alice',email:'alice@example.test',password:'Alice-password-123',profile:profile(15)});assert(r.data.ok);const alice=r.data;
+ let r=await b.rpc({action:'register',username:'alice',email:'alice@example.test',password:'Alice-password-123',profile:profile(15)});assert(r.data.ok);const alice=r.data;assert.deepEqual(alice.profiles,[]);
+ r=await b.rpc({action:'create',token:alice.token,profile:profile(15),changeId:'c'+'1'.repeat(64)});assert(r.data.ok);const alicePlayer=r.data.user;
+ r=await b.rpc({action:'create',token:alice.token,profile:{...profile(7),name:'Basil'},changeId:'c'+'2'.repeat(64)});assert(r.data.ok);const basil=r.data.user;
  r=await b.rpc({action:'register',username:'bob',email:'bob@example.test',password:'Bob-password-123',profile:profile(2)});assert(r.data.ok);const bob=r.data;
+ r=await b.rpc({action:'create',token:bob.token,profile:profile(2),changeId:'c'+'3'.repeat(64)});assert(r.data.ok);const bobPlayer=r.data.user;
  r=await b.rpc({action:'login',username:'alice',password:'wrong'});assert.equal(r.data.ok,false);const failure=r.data.message;
  r=await b.rpc({action:'login',username:'unknown',password:'wrong'});assert.equal(r.data.message,failure);
- r=await b.rpc({action:'read',token:bob.token,user:alice.user});assert.equal(r.data.profile.stats.stars,2,'Een meegestuurde vreemde eigenaar wordt genegeerd');
+ r=await b.rpc({action:'read',token:bob.token,player:alicePlayer});assert.equal(r.data.ok,false);
+ r=await b.rpc({action:'read',token:bob.token,player:bobPlayer});assert.equal(r.data.profile.stats.stars,2);
+ r=await b.rpc({action:'list',token:alice.token});assert.equal(r.data.profiles.length,2);
+ r=await b.rpc({action:'read',token:alice.token,player:basil});assert.equal(r.data.profile.stats.stars,7);
  r=await b.rpc({action:'refresh',refresh:alice.refresh});assert(r.data.ok);const fresh=r.data;
  r=await b.rpc({action:'refresh',refresh:'invalid'});assert(r.data.authExpired);
- r=await b.rpc({action:'write',token:fresh.token,profile:profile(30),revision:1});assert.equal(r.data.profile.stats.stars,30);
- r=await b.rpc({action:'write',token:alice.token,profile:profile(20),revision:1});assert.equal(r.data.profile.stats.stars,30);
+ r=await b.rpc({action:'write',player:alicePlayer,token:fresh.token,profile:profile(30),revision:1});assert.equal(r.data.profile.stats.stars,30);
+ r=await b.rpc({action:'write',player:alicePlayer,token:alice.token,profile:profile(20),revision:1});assert.equal(r.data.profile.stats.stars,30);
  r=await b.rpc({action:'read',token:'forged'});assert(r.data.authExpired);
  r=await b.rpc({action:'read',token:alice.token},'https://evil.example');assert.equal(r.status,403);
  r=await b.rpc({},'https://robinvandenbroecke.github.io','OPTIONS');assert.equal(r.status,204);

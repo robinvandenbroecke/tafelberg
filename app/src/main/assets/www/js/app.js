@@ -3343,6 +3343,11 @@
   // Voor tests in een gewone browser.
   window.Tafelberg = {
     state: function () { return S; },
+    cloudNewProfile: function (name) { return makeProfile(name, 0); },
+    cloudNormalize: function (pr) {
+      var candidate = defaultStore(); candidate.profiles[pr.id] = pr; candidate.order = [pr.id]; candidate.current = pr.id;
+      return validateBackup(JSON.parse(JSON.stringify(candidate))).profiles[pr.id];
+    },
     cloudImport: function (pr, select) {
       var candidate = defaultStore(); candidate.profiles[pr.id] = pr; candidate.order = [pr.id]; candidate.current = pr.id;
       pr = validateBackup(JSON.parse(JSON.stringify(candidate))).profiles[pr.id];

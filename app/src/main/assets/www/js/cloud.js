@@ -1,249 +1,337 @@
-/* ES5. Eén afzonderlijke aanmeldsessie per speler op dit toestel. */
+/* ES5. Eén beheerde account kan meerdere klimmers op meerdere toestellen bevatten. */
 (function () {
   'use strict';
-  var api, h, meta = { accounts: {}, device: '' }, storageKey = 'tafelberg.supabase.v1';
-  var busy = false, timer = null, ui = null, suppressed = false, linkSession = null, pendingLogin = null;
-  var native = window.AndroidSync, pending = {}, sequence = 0;
-  function random() {
-    var a = new Uint8Array(32), text = '', i;
-    if (!window.crypto || !window.crypto.getRandomValues) throw new Error('Dit toestel kan nog niet veilig online aanmelden.');
-    window.crypto.getRandomValues(a);
-    for (i = 0; i < a.length; i++) text += ('0' + a[i].toString(16)).slice(-2);
-    return text;
-  }
+  var api, h, storageKey = 'tafelberg.supabase.v2';
+  var meta = { sessions: {}, links: {}, pending: {}, creates: {}, device: '' };
+  var native = window.AndroidSync, pending = {}, sequence = 0, timer = null, busy = false, suppressed = false;
+  var ui = null, pendingLogin = null, pendingTransfers = [], pendingRows = {}, pendingLists = {}, linkSession = null;
   function configured() { return /^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/tafelberg$/.test(window.TB_CLOUD_URL || ''); }
-  function persist() { window.localStorage.setItem(storageKey, JSON.stringify(meta)); }
+  function random() {
+    var a = new Uint8Array(32), out = '';
+    if (!window.crypto || !window.crypto.getRandomValues) throw new Error('Veilig aanmelden is op dit toestel niet beschikbaar.');
+    window.crypto.getRandomValues(a);
+    for (var i = 0; i < a.length; i++) out += ('0' + a[i].toString(16)).slice(-2);
+    return out;
+  }
   function clone(p) { return JSON.parse(JSON.stringify(p)); }
+  // Postgres jsonb verandert de sleutelvolgorde; vergelijk inhoud in vaste volgorde.
+  function snapshot(value) {
+    if (value === null || typeof value !== 'object') return JSON.stringify(value);
+    var out = [], i, keys;
+    if (Array.isArray(value)) { for (i = 0; i < value.length; i++) out.push(snapshot(value[i])); return '[' + out.join(',') + ']'; }
+    keys = Object.keys(value).sort();
+    for (i = 0; i < keys.length; i++) out.push(JSON.stringify(keys[i]) + ':' + snapshot(value[keys[i]]));
+    return '{' + out.join(',') + '}';
+  }
   function profile(id) { return api.state().profiles[id]; }
-  function snapshot(id) { return JSON.stringify(profile(id)); }
-  function safe() { return api && api.current() && /^(home|who|settings|cloud)$/.test(api.current().name); }
-  function applySafe() { return api && api.current() && /^(home|who|cloud)$/.test(api.current().name); }
-  function status(id, message) { var a = meta.accounts[id]; if (a) a.message = message; if (ui && ui.id === id && ui.status) ui.status.textContent = message; }
+  function safe() { return api && api.current() && /^(home|who|cloud)$/.test(api.current().name); }
+  function persist() { window.localStorage.setItem(storageKey, JSON.stringify(meta)); }
+  function schedule() { if (timer) window.clearTimeout(timer); timer = window.setTimeout(sync, 2500); }
+  function note(account, message) {
+    if (meta.sessions[account]) meta.sessions[account].message = message;
+    if (ui && ui.account === account) ui.note.textContent = message;
+  }
   function finish(id, result) { var p = pending[id]; if (!p) return; delete pending[id]; window.clearTimeout(p.timeout); p.callback(result); }
-  function rawTransport(request, callback) {
+  function raw(request, callback) {
     if (!configured()) { callback({ ok: false, message: 'Online bewaren is nog niet beschikbaar.' }); return; }
-    if (navigator.onLine === false) { callback({ ok: false, offline: true, message: 'Geen internet. Je voortgang blijft op dit toestel.' }); return; }
+    if (navigator.onLine === false) { callback({ ok: false, message: 'Geen internet. Je voortgang blijft op dit toestel.' }); return; }
     var id = 'r' + (++sequence);
     pending[id] = { callback: callback, timeout: window.setTimeout(function () { finish(id, { ok: false, message: 'Geen bevestiging ontvangen. Je voortgang blijft op dit toestel.' }); }, 30000) };
     if (native && typeof native.request === 'function') { native.request(window.TB_CLOUD_URL, id, JSON.stringify(request)); return; }
     if (window.AndroidStore) { finish(id, { ok: false, message: 'Installeer de nieuwe APK om online te bewaren, of gebruik de webapp.' }); return; }
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', window.TB_CLOUD_URL, true); xhr.timeout = 25000;
+    var xhr = new XMLHttpRequest(); xhr.open('POST', window.TB_CLOUD_URL, true); xhr.timeout = 25000;
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onload = function () { try { finish(id, JSON.parse(xhr.responseText)); } catch (e) { finish(id, { ok: false, message: 'Online bewaren lukt nu niet.' }); } };
+    xhr.onload = function () { try { finish(id, JSON.parse(xhr.responseText)); } catch (e) { finish(id, { ok: false, message: 'Ongeldig antwoord. Je voortgang blijft lokaal.' }); } };
     xhr.onerror = xhr.ontimeout = function () { finish(id, { ok: false, message: 'Geen verbinding. Je voortgang blijft op dit toestel.' }); };
     try { xhr.send(JSON.stringify(request)); } catch (e) { finish(id, { ok: false, message: 'Geen verbinding. Je voortgang blijft op dit toestel.' }); }
   }
   function transport(request, callback) {
-    var account = null;
-    for (var id in meta.accounts) if (meta.accounts.hasOwnProperty(id) && request.token && meta.accounts[id].token === request.token) account = meta.accounts[id];
+    var session = null;
+    for (var a in meta.sessions) if (meta.sessions.hasOwnProperty(a) && request.token && meta.sessions[a].token === request.token) session = meta.sessions[a];
     function refresh(next) {
-      rawTransport({ action: 'refresh', refresh: account.refresh }, function (result) {
-        if (!result.ok) { callback(result); return; }
-        account.token = result.token; account.refresh = result.refresh; account.expires = result.expires;
+      raw({ action: 'refresh', refresh: session.refresh }, function (r) {
+        if (!r.ok) { callback(r); return; }
+        session.token = r.token; session.refresh = r.refresh; session.expires = r.expires;
         try { persist(); } catch (e) { callback({ ok: false, message: 'De opslag is vol. Maak een voortgangskopie.' }); return; }
-        request.token = account.token; next();
+        request.token = session.token; next();
       });
     }
-    function send(retried) {
-      rawTransport(request, function (result) {
-        if (result.authExpired && account && account.refresh && !retried) refresh(function () { send(true); });
-        else callback(result);
-      });
-    }
-    if (account && account.refresh && account.expires < Date.now() + 60000) refresh(function () { send(true); });
-    else send(false);
+    function send(retried) { raw(request, function (r) { if (r.authExpired && session && session.refresh && !retried) refresh(function () { send(true); }); else callback(r); }); }
+    if (session && session.refresh && session.expires < Date.now() + 60000) refresh(function () { send(true); }); else send(false);
   }
   function capture() {
     if (!api || suppressed) return;
-    for (var id in meta.accounts) if (meta.accounts.hasOwnProperty(id)) {
-      var a = meta.accounts[id];
-      if (!profile(id)) { delete meta.accounts[id]; continue; }
-      a.dirty = snapshot(id) !== a.base;
+    for (var id in meta.links) if (meta.links.hasOwnProperty(id)) {
+      if (!profile(id)) delete meta.links[id]; else meta.links[id].dirty = snapshot(profile(id)) !== meta.links[id].base;
     }
-    try { persist(); } catch (e) { /* Spelopslag zelf blijft via de bestaande opslag werken. */ }
+    try { persist(); } catch (e) { /* De afzonderlijke spelopslag blijft bestaan. */ }
     schedule();
   }
-  function schedule() { if (timer) window.clearTimeout(timer); timer = window.setTimeout(sync, 2500); }
-  function install(id, remote, revision) {
-    var a = meta.accounts[id];
+  function install(row, account, select) {
+    if (!row || !row.profile || row.user !== row.profile.id || row.account && row.account !== account) throw new Error('Ongeldige klimmer.');
+    var remote = api.cloudNormalize(row.profile), local = profile(row.user), old = meta.links[row.user];
+    if (old && old.account !== account) throw new Error('Deze klimmer hoort bij een ander account.');
+    var keep = local && (TBProgress.compare(local, remote) > 0 || (old && old.dirty && TBProgress.compare(local, remote) === 0));
     suppressed = true;
-    try { api.cloudImport(remote, false); a.base = snapshot(id); a.revision = revision; a.dirty = false; a.remote = null; persist(); }
-    finally { suppressed = false; }
-    status(id, 'Online bewaard.');
-    var screen = api.current(); if (screen && /^(home|who)$/.test(screen.name)) api.go(screen.name, screen.params);
+    try {
+      if (!keep) api.cloudImport(remote, !!select); else if (select) api.cloudSelect(row.user);
+      meta.links[row.user] = { account: account, revision: row.revision, base: snapshot(remote), dirty: snapshot(profile(row.user)) !== snapshot(remote), message: snapshot(profile(row.user)) === snapshot(remote) ? 'Online bewaard.' : 'Voortgang wacht op verzending.' };
+      persist();
+    } finally { suppressed = false; }
+  }
+  function absorb(result, account) {
+    if (!result || result.account !== account || !Array.isArray(result.profiles) || result.profiles.length > 50) throw new Error('Ongeldige accountgegevens.');
+    for (var i = 0; i < result.profiles.length; i++) install(result.profiles[i], account, false);
+    meta.sessions[account].checked = Date.now(); persist();
+  }
+  function redraw(account) { if (api.current().name === 'cloud' && ui && ui.account === account) show(document.getElementById('app'), { mode: 'account', account: account, cached: true }); }
+  function refreshAccount(account) {
+    var session = meta.sessions[account]; if (!session || busy) return;
+    busy = true; note(account, 'Klimmers ophalen…');
+    transport({ action: 'list', token: session.token }, function (r) {
+      busy = false; if (meta.sessions[account] !== session) return;
+      try {
+        if (!r.ok) note(account, r.message);
+        else if (safe()) { absorb(r, account); note(account, 'Klimmers bijgewerkt.'); redraw(account); }
+        else pendingLists[account] = r;
+      } catch (e) { note(account, 'Niet toegepast: ' + e.message); }
+      schedule();
+    });
+  }
+  function sourceIds() {
+    var out = [], ids = api.state().order;
+    for (var i = 0; i < ids.length; i++) if (profile(ids[i]) && !meta.links[ids[i]]) out.push(ids[i]);
+    return out;
+  }
+  function accountIds(account) {
+    var out = [], ids = api.state().order;
+    for (var i = 0; i < ids.length; i++) if (meta.links[ids[i]] && meta.links[ids[i]].account === account && profile(ids[i])) out.push(ids[i]);
+    return out;
+  }
+  function label(p) { var rank = TBProgress.rank(p); return p.name + ': ' + rank[0] + ' sterren, ' + rank[1] + ' rondes'; }
+  function button(text, fn) { return h('button', { class: 'btn btn-line', onclick: fn }, text); }
+  function field(text, type, autocomplete) {
+    var input = h('input', { class: 'name-input', type: type || 'text', 'aria-label': text, autocomplete: autocomplete || 'off', maxlength: type === 'password' ? '128' : type === 'email' ? '254' : '30' });
+    if (type !== 'password') input.setAttribute('autocapitalize', 'none');
+    return { input: input, node: h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, text), input]) };
+  }
+  function chooser(text, ids, empty, initial) {
+    var select = h('select', { class: 'name-input', 'aria-label': text });
+    select.appendChild(h('option', { value: '' }, empty));
+    for (var i = 0; i < ids.length; i++) select.appendChild(h('option', { value: ids[i] }, label(profile(ids[i]))));
+    select.value = ids.indexOf(initial) >= 0 ? initial : '';
+    return { input: select, node: h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, text), select]) };
+  }
+  function finishTransfer(result, sourceId, createKey) {
+    var account = result.account, source = sourceId && profile(sourceId), local = profile(result.user), remote = api.cloudNormalize(result.profile), chosen = remote, useSource = false;
+    if (!meta.sessions[account]) return;
+    if (sourceId && meta.links[sourceId]) throw new Error('Deze lokale klimmer is al gekoppeld.');
+    if (local && TBProgress.compare(local, chosen) > 0) chosen = local;
+    if (source && TBProgress.compare(source, chosen) >= 0) { chosen = clone(source); chosen.id = result.user; useSource = true; }
+    suppressed = true;
+    try {
+      // Eerst bevestigd door de server en duurzaam lokaal bewaren, dan pas de losse bron vervangen.
+      if (useSource) api.cloudReplaceId(sourceId, chosen); else api.cloudImport(chosen, true);
+      meta.links[result.user] = { account: account, revision: result.revision, base: snapshot(remote), dirty: snapshot(profile(result.user)) !== snapshot(remote), message: 'Online bewaard.' };
+      persist();
+    } finally { suppressed = false; }
+    if (createKey) { delete meta.creates[createKey]; persist(); }
+    note(account, source && !useSource ? 'De accountklimmer staat verder. Die versie blijft behouden; je lokale klimmer is apart bewaard.' : 'De klimmer is toegevoegd. De verste voortgang blijft bewaard.');
+    redraw(account); schedule();
+  }
+  function transfer(account, sourceId, targetId, emptyProfile) {
+    var session = meta.sessions[account];
+    if (!session || busy) { note(account, 'Even wachten en opnieuw proberen.'); return; }
+    var source = sourceId && profile(sourceId), target = targetId && meta.links[targetId];
+    if (sourceId && (!source || meta.links[sourceId])) { note(account, 'Kies een losse lokale klimmer.'); return; }
+    if (targetId && (!target || target.account !== account)) { note(account, 'Kies een klimmer uit dit account.'); return; }
+    var candidate = clone(source || emptyProfile), key = account + ':' + (sourceId || 'new:' + candidate.name), create = !targetId;
+    var request = { action: create ? 'create' : 'write', token: session.token, profile: candidate, player: targetId || null, revision: target ? target.revision : 0 };
+    if (create) {
+      try { if (!meta.creates[key]) meta.creates[key] = { id: 'c' + random() }; request.changeId = meta.creates[key].id; persist(); }
+      catch (e) { note(account, 'Maak een kopie: de opslag van dit toestel is vol.'); return; }
+    }
+    busy = true; note(account, 'Voortgang verzenden…');
+    transport(request, function (r) {
+      busy = false; if (meta.sessions[account] !== session) return;
+      if (!r.ok) { note(account, r.message || 'Niet verzonden. De lokale voortgang blijft behouden.'); return; }
+      try {
+        if (r.account !== account) throw new Error('Ongeldig accountantwoord.');
+        if (safe()) finishTransfer(r, sourceId, create ? key : null); else pendingTransfers.push({ result: r, source: sourceId, key: create ? key : null });
+        persist(); schedule();
+      } catch (e) { note(account, 'Niet toegepast: ' + e.message); }
+    });
+  }
+  function acceptAccount(result, sourceId) {
+    if (!safe()) { pendingLogin = { result: result, source: sourceId }; schedule(); return; }
+    if (!result.account || !/^[a-f0-9-]{36}$/.test(result.account)) throw new Error('Ongeldig accountantwoord.');
+    var account = result.account;
+    meta.sessions[account] = { username: result.username, token: result.token, refresh: result.refresh, expires: result.expires, checked: Date.now(), message: 'Aangemeld.' };
+    absorb(result, account); meta.lastUsername = result.username;
+    if (meta.pending[result.username]) delete meta.pending[result.username]; persist();
+    api.go('cloud', { mode: 'account', account: account, cached: true });
+    // Bij registratie heeft de gebruiker deze eerste upload al uitdrukkelijk gekozen.
+    if (sourceId && profile(sourceId) && !meta.links[sourceId]) transfer(account, sourceId, null);
+    else schedule();
   }
   function sync() {
     if (!api || busy || !configured() || navigator.onLine === false) return;
-    if (pendingLogin && applySafe()) { var login = pendingLogin; pendingLogin = null; acceptLogin(login.result, login.sourceId); return; }
-    var id = api.state().current, a = meta.accounts[id];
-    // Ook eerder gespeelde klimmers flushen als inmiddels een andere speler actief is.
-    if (!a || !a.dirty) for (var other in meta.accounts) if (meta.accounts.hasOwnProperty(other) && meta.accounts[other].dirty && profile(other)) { id = other; a = meta.accounts[id]; break; }
-    if (!a || !a.token || !profile(id)) return;
-    if (a.remote && applySafe()) {
-      var remembered = a.remote; a.remote = null;
-      if (TBProgress.compare(profile(id), remembered.profile) <= 0) install(id, remembered.profile, remembered.revision);
-      else { a.base = JSON.stringify(remembered.profile); a.revision = remembered.revision; }
+    if (safe()) {
+      if (pendingLogin) { var login = pendingLogin; pendingLogin = null; acceptAccount(login.result, login.source); return; }
+      if (pendingTransfers.length) { var item = pendingTransfers.shift(); finishTransfer(item.result, item.source, item.key); return; }
+      for (var account in pendingLists) if (pendingLists.hasOwnProperty(account) && meta.sessions[account]) { var list = pendingLists[account]; delete pendingLists[account]; absorb(list, account); }
+      for (var id in pendingRows) if (pendingRows.hasOwnProperty(id) && meta.links[id]) { var row = pendingRows[id]; delete pendingRows[id]; install(row, meta.links[id].account, false); }
     }
-    captureWithoutTimer(id);
-    var raw = snapshot(id), writing = a.dirty;
-    if (!writing && !applySafe()) return;
-    busy = true; status(id, writing ? 'Voortgang bewaren…' : 'Voortgang controleren…');
-    var request = { action: writing ? 'write' : 'read', token: a.token, device: meta.device };
-    if (writing) {
-      try { if (!a.change || a.change.raw !== raw) a.change = { id: 'c' + random(), raw: raw }; } catch (e) { busy = false; status(id, e.message); return; }
-      request.changeId = a.change.id; request.revision = a.revision; request.profile = JSON.parse(raw);
-      try { persist(); } catch (e) { busy = false; status(id, 'Maak een kopie: de opslag van dit toestel is vol.'); return; }
-    }
-    transport(request, function (result) {
-      busy = false;
-      if (meta.accounts[id] !== a || !profile(id)) return;
-      if (!result.ok) status(id, result.message || 'Online bewaren lukt nu niet.');
-      else {
-        try {
-          var remote = JSON.stringify(result.profile), local = snapshot(id);
-          a.revision = result.revision; a.change = null;
-          if (remote === local) { a.base = local; a.dirty = false; status(id, 'Online bewaard.'); }
-          else if (TBProgress.compare(profile(id), result.profile) <= 0) {
-            if (applySafe()) install(id, result.profile, result.revision);
-            else { a.remote = { profile: result.profile, revision: result.revision }; status(id, 'De verste voortgang wordt na deze ronde geladen.'); }
-          } else { a.base = remote; a.dirty = true; status(id, 'De voortgang van dit toestel staat verder. Wordt bewaard…'); schedule(); }
-          persist();
-        } catch (e) { status(id, 'Niet toegepast: ' + e.message); }
-      }
-      try { persist(); } catch (e2) { /* Bestaande lokale spelopslag is ongewijzigd. */ }
-      if (result.ok) for (var other in meta.accounts) if (meta.accounts.hasOwnProperty(other) && other !== id && meta.accounts[other].dirty) { schedule(); break; }
-
+    var selected = api.state().current, link = meta.links[selected];
+    for (var pid in meta.links) if (meta.links.hasOwnProperty(pid) && profile(pid) && meta.links[pid].dirty) { selected = pid; link = meta.links[pid]; break; }
+    if (!link || !profile(selected) || !meta.sessions[link.account]) return;
+    var session = meta.sessions[link.account], writing = snapshot(profile(selected)) !== link.base;
+    if (!writing && !safe()) return;
+    if (!writing && Date.now() - (session.checked || 0) > 60000) { refreshAccount(link.account); return; }
+    var request = { action: writing ? 'write' : 'read', token: session.token, player: selected, revision: link.revision };
+    if (writing) request.profile = clone(profile(selected));
+    busy = true; link.message = writing ? 'Voortgang bewaren…' : 'Voortgang controleren…';
+    transport(request, function (r) {
+      busy = false; if (meta.sessions[link.account] !== session || meta.links[selected] !== link || !profile(selected)) return;
+      try {
+        if (!r.ok) { link.message = r.message; note(link.account, r.message); }
+        else if (safe()) { install(r, link.account, false); note(link.account, 'Online bewaard.'); }
+        else {
+          var remote = api.cloudNormalize(r.profile);
+          if (snapshot(remote) === snapshot(profile(selected))) { link.base = snapshot(remote); link.dirty = false; link.revision = r.revision; link.message = 'Online bewaard.'; }
+          else pendingRows[selected] = r;
+        }
+        persist();
+      } catch (e) { note(link.account, 'Niet toegepast: ' + e.message); }
+      if (r.ok) for (var next in meta.links) if (meta.links.hasOwnProperty(next) && meta.links[next].dirty) { schedule(); break; }
     });
   }
-  function captureWithoutTimer(id) { if (api && profile(id) && meta.accounts[id]) meta.accounts[id].dirty = snapshot(id) !== meta.accounts[id].base; }
-  function button(label, fn) { return h('button', { class: 'btn btn-line', onclick: fn }, label); }
-  function field(label, type, autocomplete) {
-    var input = h('input', { class: 'name-input', type: type || 'text', 'aria-label': label, autocomplete: autocomplete || 'off', maxlength: type === 'password' ? '128' : type === 'email' ? '254' : '30' });
-    if (type === 'password') input.setAttribute('minlength', '12');
-    if (type !== 'password') input.setAttribute('autocapitalize', 'none');
-    return { input: input, node: h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, label), input]) };
-  }
-  function acceptLogin(result, sourceId) {
-    if (!result.user || !result.profile || result.user !== result.profile.id) throw new Error('Ongeldig accountantwoord.');
-    var target = result.user, local = profile(target), source = sourceId && profile(sourceId), chosen = result.profile;
-    if (local && TBProgress.compare(local, chosen) > 0) chosen = local;
-    if (source && TBProgress.compare(source, chosen) >= 0) { chosen = clone(source); chosen.id = target; }
-    suppressed = true;
-    try {
-      if (sourceId && sourceId !== target) api.cloudReplaceId(sourceId, chosen); else api.cloudImport(chosen, true);
-      meta.accounts[target] = { user: target, username: result.username, token: result.token, refresh: result.refresh,
-        expires: result.expires, revision: result.revision, base: JSON.stringify(result.profile), dirty: snapshot(target) !== JSON.stringify(result.profile), message: 'Aangemeld. Voortgang wordt gecontroleerd.' };
-      if (meta.pending && meta.pending[result.username]) delete meta.pending[result.username];
-      meta.lastUsername = result.username;
-      persist(); api.go('cloud', { id: target }); schedule();
-    } finally { suppressed = false; }
-  }
   function show(root, params) {
-    root.innerHTML = ''; var id = params.id || api.state().current, p = profile(id), a = meta.accounts[id];
-    var content = h('div', { class: 'cloud-card' }), note = h('p', { class: 'set-note', role: 'status' });
-    ui = { id: id, status: note };
-    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(p ? 'settings' : 'newPlayer'); }), h('h1', null, 'Online bewaren')]), h('div', { class: 'cloud-main' }, content)]));
+    root.innerHTML = '';
+    var current = api.state().current, linked = meta.links[current], account = params.account || (linked && linked.account), s;
+    if (!account) for (var accountKey in meta.sessions) if (meta.sessions.hasOwnProperty(accountKey)) { account = accountKey; break; }
+    s = account && meta.sessions[account];
+    var mode = params.mode || (s ? 'account' : current ? 'register' : 'login');
+    var content = h('div', { class: 'cloud-card' }), status = h('p', { class: 'set-note', role: 'status' });
+    ui = { account: account, note: status };
+    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'settings' : 'newPlayer'); }), h('h1', null, 'Online bewaren')]), h('div', { class: 'cloud-main' }, content)]));
     if (!configured()) { content.appendChild(h('p', null, 'Online bewaren is nog niet beschikbaar. Je voortgang blijft op dit toestel.')); return; }
-    var mode = params.mode || (a && a.token ? 'account' : p ? 'register' : 'login');
+    if (mode === 'account' && s) {
+      content.appendChild(h('h2', null, 'Account van ' + s.username));
+      content.appendChild(h('p', null, 'Eén account, meerdere klimmers. Elke klimmer heeft eigen tafels, sterren en voortgang.'));
+      status.textContent = s.message || 'Je voortgang blijft ook lokaal bewaard.'; content.appendChild(status);
+      var ids = accountIds(account);
+      content.appendChild(h('h3', null, 'Klimmers in dit account'));
+      if (!ids.length) content.appendChild(h('p', null, 'Voeg je eerste klimmer toe of neem lokale voortgang mee.'));
+      for (var i = 0; i < ids.length; i++) (function (id) {
+        content.appendChild(h('p', { class: 'set-note' }, label(profile(id))));
+        content.appendChild(button('Spelen met ' + profile(id).name, function () { api.cloudSelect(id); api.go('home'); }));
+      })(ids[i]);
+      var name = field('Naam van nieuwe klimmer'); name.input.maxLength = 20;
+      content.appendChild(h('h3', null, 'Nieuwe klimmer')); content.appendChild(name.node);
+      content.appendChild(button('Nieuwe klimmer maken', function () {
+        var n = name.input.value.replace(/^\s+|\s+$/g, ''); if (!n) { status.textContent = 'Vul een naam in.'; return; }
+        transfer(account, null, null, api.cloudNewProfile(n));
+      }));
+      var sources = sourceIds();
+      if (sources.length) {
+        content.appendChild(h('h3', null, 'Lokale voortgang meenemen'));
+        var source = chooser('Lokale klimmer meenemen', sources, 'Kies een lokale klimmer', null);
+        var target = chooser('Opslaan als', ids, 'Nieuwe klimmer in dit account', null);
+        content.appendChild(source.node); content.appendChild(target.node);
+        content.appendChild(h('p', { class: 'set-note' }, 'Kies bij koppelen aan een bestaande klimmer dezelfde persoon. Alleen de verste volledige voortgang blijft behouden; sterren worden niet opgeteld.'));
+        content.appendChild(button('Voortgang toevoegen', function () { if (!source.input.value) { status.textContent = 'Kies eerst een lokale klimmer.'; return; } transfer(account, source.input.value, target.input.value || null); }));
+      }
+      content.appendChild(button('Klimmers bijwerken', function () { refreshAccount(account); }));
+      content.appendChild(button('Ander account aanmelden', function () { api.go('cloud', { mode: 'login' }); }));
+      content.appendChild(button('Afmelden op dit toestel', function () {
+        if (!window.confirm('Afmelden voor dit account? Alle klimmers blijven lokaal beschikbaar. Nog niet verzonden voortgang staat dan niet online.')) return;
+        transport({ action: 'logout', token: s.token }, function () {});
+        delete meta.sessions[account];
+        for (var id in meta.links) if (meta.links.hasOwnProperty(id) && meta.links[id].account === account) delete meta.links[id];
+        persist(); api.go('cloud', { mode: 'login' });
+      }));
+      if (!params.cached) refreshAccount(account);
+      return;
+    }
     if (mode === 'reset' || mode === 'resume') {
       content.appendChild(h('h2', null, mode === 'reset' ? 'Nieuw wachtwoord kiezen' : 'Account bevestigd'));
       if (!linkSession) { content.appendChild(h('p', null, 'Deze link is niet meer geldig. Vraag een nieuwe herstelmail of meld je aan.')); return; }
-      var newPassword = field('Nieuw wachtwoord', 'password', 'new-password'), confirmPassword = field('Herhaal wachtwoord', 'password', 'new-password');
-      if (mode === 'reset') { content.appendChild(newPassword.node); content.appendChild(confirmPassword.node); }
+      var password = field('Nieuw wachtwoord', 'password', 'new-password'), repeat = field('Herhaal wachtwoord', 'password', 'new-password');
+      if (mode === 'reset') { content.appendChild(password.node); content.appendChild(repeat.node); }
       var finishButton = button(mode === 'reset' ? 'Wachtwoord opslaan' : 'Verder met dit account', function () {
-        if (mode === 'reset' && (newPassword.input.value.length < 12 || newPassword.input.value !== confirmPassword.input.value)) { note.textContent = 'Gebruik minstens 12 tekens en herhaal hetzelfde wachtwoord.'; return; }
-        finishButton.disabled = true;
-        var request = { action: mode, token: linkSession.token };
-        if (mode === 'reset') request.password = newPassword.input.value;
-        newPassword.input.value = ''; confirmPassword.input.value = '';
-        transport(request, function (result) {
-          finishButton.disabled = false;
-          if (!result.ok) { note.textContent = result.message; return; }
-          if (mode === 'reset') { linkSession = null; note.textContent = result.message; finishButton.disabled = true; content.appendChild(button('Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
+        if (mode === 'reset' && (password.input.value.length < 12 || password.input.value !== repeat.input.value)) { status.textContent = 'Gebruik twee gelijke wachtwoorden van minstens 12 tekens.'; return; }
+        finishButton.disabled = true; var request = { action: mode, token: linkSession.token };
+        if (mode === 'reset') request.password = password.input.value; password.input.value = ''; repeat.input.value = '';
+        transport(request, function (r) {
+          finishButton.disabled = false; if (!r.ok) { status.textContent = r.message; return; }
+          if (mode === 'reset') { linkSession = null; status.textContent = r.message; finishButton.disabled = true; content.appendChild(button('Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
           try {
-            result.token = linkSession.token; result.refresh = linkSession.refresh; result.expires = linkSession.expires;
-            var sourceId = meta.pending && meta.pending[result.username] ? meta.pending[result.username].id : null;
-            acceptLogin(result, sourceId); linkSession = null;
-          } catch (e) { note.textContent = 'Niet toegepast: ' + e.message; }
+            r.token = linkSession.token; r.refresh = linkSession.refresh; r.expires = linkSession.expires;
+            var remembered = meta.pending[r.username]; acceptAccount(r, remembered && remembered.source); linkSession = null;
+          } catch (e) { status.textContent = 'Niet toegepast: ' + e.message; }
         });
       });
-      content.appendChild(finishButton); content.appendChild(note); return;
+      content.appendChild(finishButton); content.appendChild(status); return;
     }
-    if (a && a.token && mode === 'account') {
-      content.appendChild(h('h2', null, 'Aangemeld als ' + a.username)); note.textContent = a.message || 'Je voortgang blijft ook op dit toestel bewaard.';
-      content.appendChild(note);
-      content.appendChild(h('p', { class: 'set-note' }, 'Op verschillende toestellen gespeeld? De meeste sterren bepalen welke versie blijft. Bij gelijkstand tellen afgeronde rondes en daarna de beheersing van de sommen.'));
-      content.appendChild(button('Nu synchroniseren', sync));
-      content.appendChild(button('Afmelden op dit toestel', function () {
-        if (!window.confirm('Afmelden? De voortgang blijft op dit toestel. Niet-verzonden wijzigingen staan dan nog niet online.')) return;
-        transport({ action: 'logout', token: a.token }, function () {}); delete meta.accounts[id]; persist(); show(root, { id: id, mode: 'login' });
-      }));
-      content.appendChild(button('Andere online speler toevoegen', function () { api.go('cloud', { mode: 'login' }); })); return;
-    }
-    content.appendChild(h('p', null, 'Met je gebruikersnaam en wachtwoord speel je verder op andere toestellen. Dit toestel kan meerdere spelers onthouden.'));
-    content.appendChild(h('h2', null, mode === 'register' && p ? 'Bewaar de voortgang van ' + p.name : mode === 'recover' ? 'Wachtwoord vergeten' : 'Bestaande speler aanmelden'));
-    var username = field('Gebruikersnaam', 'text', 'username'), password = field('Wachtwoord', 'password', mode === 'login' ? 'current-password' : 'new-password'), repeat = field('Herhaal wachtwoord', 'password', 'new-password'), email = field('Herstel-e-mailadres', 'email', 'email');
+    content.appendChild(h('h2', null, mode === 'register' ? 'Een account voor je klimmers' : mode === 'recover' ? 'Wachtwoord vergeten' : 'Account aanmelden'));
+    content.appendChild(h('p', null, 'Een ouderaccount kan meerdere klimmers op verschillende toestellen onthouden. De kinderen hebben geen eigen e-mailadres nodig.'));
+    var username = field('Gebruikersnaam', 'text', 'username'), pass = field('Wachtwoord', 'password', mode === 'login' ? 'current-password' : 'new-password');
+    var confirmPass = field('Herhaal wachtwoord', 'password', 'new-password'), email = field('Herstel-e-mailadres', 'email', 'email');
     if (meta.lastUsername) username.input.value = meta.lastUsername;
-    content.appendChild(username.node);
-    if (mode !== 'recover') content.appendChild(password.node);
-    if (mode === 'register') { content.appendChild(repeat.node); content.appendChild(email.node); }
-    content.appendChild(h('p', { class: 'set-note' }, mode === 'register' ? 'Gebruikersnaam: 3 tot 30 letters, cijfers, - of _. Wachtwoord: minstens 12 tekens. Elk account heeft een eigen e-mailadres voor bevestiging en herstel.' : mode === 'recover' ? 'We sturen de herstellink naar het e-mailadres dat bij dit account hoort.' : 'Gebruik je Tafelberg-account. Lokaal opgeslagen spelers blijven beschikbaar.'));
+    content.appendChild(username.node); if (mode !== 'recover') content.appendChild(pass.node);
+    var firstSource = null;
+    if (mode === 'register') {
+      content.appendChild(confirmPass.node); content.appendChild(email.node);
+      firstSource = chooser('Voortgang bij account maken', sourceIds(), 'Nog geen lokale voortgang meenemen', current); content.appendChild(firstSource.node);
+      content.appendChild(h('p', { class: 'set-note' }, 'Kies eventueel je eerste lokale klimmer. Na e-mailbevestiging wordt die toegevoegd. Andere klimmers kun je daarna meenemen.'));
+    }
     var submit = button(mode === 'register' ? 'Account maken en bewaren' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden', function () {
       if (submit.disabled) return;
-      var name = username.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
-      if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(name)) { note.textContent = 'Controleer je gebruikersnaam.'; return; }
-      if (mode !== 'recover' && !password.input.value.length) { note.textContent = 'Vul je wachtwoord in.'; return; }
-      if (mode === 'register' && (!p || password.input.value.length < 12 || password.input.value !== repeat.input.value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.input.value))) { note.textContent = 'Controleer het e-mailadres en gebruik twee gelijke wachtwoorden van minstens 12 tekens.'; return; }
-      var request = { action: mode, username: name, device: meta.device };
-      if (mode !== 'recover') request.password = password.input.value;
-      if (mode === 'register') { request.email = email.input.value; request.profile = clone(p); }
-      var sourceId = mode === 'register' ? id : meta.pending && meta.pending[name] ? meta.pending[name].id : null;
-      if (mode === 'login' && sourceId && profile(sourceId)) request.profile = clone(profile(sourceId));
-      password.input.value = ''; repeat.input.value = ''; submit.disabled = true; note.textContent = 'Even verbinden…';
-      transport(request, function (result) {
-        submit.disabled = false;
-        if (!result.ok) { note.textContent = result.message || 'Aanmelden lukt nu niet.'; return; }
-        if (mode === 'recover') { note.textContent = result.message; return; }
-        if (result.confirmation) {
-          meta.pending = meta.pending || {}; meta.pending[name] = { id: id }; meta.lastUsername = name; persist(); note.textContent = result.message;
-          content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return;
-        }
-        try { if (!applySafe()) { pendingLogin = { result: result, sourceId: sourceId }; schedule(); } else acceptLogin(result, sourceId); } catch (e) { note.textContent = 'Aanmelding ontvangen, maar lokaal bewaren lukte niet: ' + e.message; }
+      var u = username.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
+      if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(u) || u === 'constructor' || u === 'prototype') { status.textContent = 'Gebruik 3 tot 30 letters, cijfers, - of _.'; return; }
+      if (mode !== 'recover' && !pass.input.value.length) { status.textContent = 'Vul je wachtwoord in.'; return; }
+      if (mode === 'register' && (pass.input.value.length < 12 || pass.input.value !== confirmPass.input.value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.input.value))) { status.textContent = 'Controleer je e-mailadres en gebruik twee gelijke wachtwoorden van minstens 12 tekens.'; return; }
+      var source = mode === 'register' ? firstSource.input.value || null : meta.pending[u] && meta.pending[u].source;
+      var request = { action: mode, username: u };
+      if (mode !== 'recover') request.password = pass.input.value;
+      if (mode === 'register') request.email = email.input.value;
+      pass.input.value = ''; confirmPass.input.value = ''; submit.disabled = true; status.textContent = 'Even verbinden…';
+      transport(request, function (r) {
+        submit.disabled = false; if (!r.ok) { status.textContent = r.message || 'Aanmelden lukt nu niet.'; return; }
+        if (mode === 'recover') { status.textContent = r.message; return; }
+        if (r.confirmation) { meta.pending[u] = { source: source }; meta.lastUsername = u; persist(); status.textContent = r.message; content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
+        try { acceptAccount(r, source); } catch (e) { status.textContent = 'Niet toegepast: ' + e.message; }
       });
     });
-    content.appendChild(submit); content.appendChild(note);
+    content.appendChild(submit); content.appendChild(status);
     if (mode !== 'login') content.appendChild(button('Ik heb al een account', function () { api.go('cloud', { mode: 'login' }); }));
-    if (mode === 'login') {
-      content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); }));
-      if (p) content.appendChild(button('Deze klimmer online bewaren', function () { api.go('cloud', { id: id, mode: 'register' }); }));
-    }
+    if (mode === 'login') { content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); })); content.appendChild(button('Nieuw account maken', function () { api.go('cloud', { mode: 'register' }); })); }
   }
   window.TBCloud = {
     configured: configured,
-    linked: function (id) { return !!meta.accounts[id]; },
-    detach: function (id) { delete meta.accounts[id]; persist(); },
+    linked: function (id) { return !!meta.links[id]; },
+    detach: function (id) { delete meta.links[id]; persist(); },
     init: function (app, dom) {
       api = app; h = dom;
-      try { var saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null'); if (saved && saved.accounts && typeof saved.accounts === 'object') meta = saved; if (!meta.device) meta.device = random(); persist(); }
-      catch (e) { meta = { accounts: {}, device: '' }; }
+      try { var saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null'); if (saved && saved.sessions && saved.links) meta = saved; meta.pending = meta.pending || {}; meta.creates = meta.creates || {}; if (!meta.device) meta.device = random(); persist(); }
+      catch (e) { meta = { sessions: {}, links: {}, pending: {}, creates: {}, device: '' }; }
       try {
-        var hash = window.location.hash.substring(1).split('&'), values = {};
-        for (var hi = 0; hi < hash.length; hi++) { var pair = hash[hi].split('='); values[decodeURIComponent(pair[0])] = decodeURIComponent(pair.slice(1).join('=')); }
+        var parts = location.hash.substring(1).split('&'), values = {};
+        for (var i = 0; i < parts.length; i++) { var pair = parts[i].split('='); values[decodeURIComponent(pair[0])] = decodeURIComponent(pair.slice(1).join('=')); }
         if (values.access_token) {
           linkSession = { token: values.access_token, refresh: values.refresh_token, expires: Date.now() + Number(values.expires_in || 3600) * 1000 };
-          window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+          history.replaceState(history.state, '', location.pathname + location.search);
           window.setTimeout(function () { api.go('cloud', { mode: values.type === 'recovery' ? 'reset' : 'resume' }); }, 0);
         }
       } catch (e2) { linkSession = null; }
-      window.addEventListener('online', schedule, false);
-      window.setInterval(function () { if (safe()) sync(); }, 60000);
+      window.addEventListener('online', schedule, false); window.setInterval(function () { if (safe()) sync(); }, 60000);
     },
     saved: capture,
     screen: function () { if (api.current().name !== 'cloud') ui = null; schedule(); },
     render: show,
-    nativeReply: function (id, result) { finish(id, result); },
+    nativeReply: finish,
     sync: sync,
-    status: function (id) { var a = meta.accounts[id]; return a ? a.message || 'Online bewaren staat aan.' : 'Bewaar deze klimmer ook op andere toestellen.'; }
+    status: function (id) { var link = meta.links[id]; return link ? link.message || 'Deze klimmer wordt online bewaard.' : 'Bewaar deze klimmer bij een account met meerdere klimmers.'; }
   };
 }());

@@ -19,10 +19,14 @@ export function createHandler(config, fetcher = fetch) {
     return r.ok && r.data === true;
   }
   function session(data) { return { token: data.access_token, refresh: data.refresh_token, expires: Date.now() + data.expires_in * 1000 }; }
-  async function progress(token, candidate = null, revision = 0) {
-    const r = await call('/rest/v1/rpc/tb_sync', { candidate, base_revision: revision }, token);
+  async function progress(token, candidate = null, revision = 0, player = null, createNew = false, createKey = null) {
+    const r = await call('/rest/v1/rpc/tb_sync', { candidate, base_revision: revision, requested_profile: player, create_new: createNew, request_key: createKey }, token);
     if (!r.ok) return { ok: false, message: r.status === 401 ? 'Meld je opnieuw aan.' : 'Voortgang kon niet worden bewaard. Je lokale voortgang blijft behouden.', authExpired: r.status === 401 };
     return r.data;
+  }
+  async function list(token) {
+    const r = await call('/rest/v1/rpc/tb_list_profiles', {}, token);
+    return r.ok ? r.data : { ok: false, authExpired: r.status === 401, message: 'Klimmers ophalen lukt nu niet.' };
   }
   return async function handler(req) {
     const requestOrigin = req.headers.get('origin');
@@ -41,7 +45,7 @@ export function createHandler(config, fetcher = fetch) {
       });
       if (!input || typeof input !== 'object') return reply({ ok: false, message: 'Ongeldige aanvraag.' }, 400);
       const action = input.action;
-      if (!['register','login','recover','refresh','resume','reset','logout','read','write'].includes(action)) return reply({ ok: false, message: 'Onbekende aanvraag.' }, 400);
+      if (!['register','login','recover','refresh','resume','reset','logout','read','write','list','create'].includes(action)) return reply({ ok: false, message: 'Onbekende aanvraag.' }, 400);
       // Supabase zet het bronadres; gebruikersnamen en IP's worden alleen gehasht opgeslagen.
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
       if (!await limit('ip:' + ip, 120, 60)) return reply({ ok: false, message: 'Even wachten en opnieuw proberen.' }, 429);
@@ -59,7 +63,7 @@ export function createHandler(config, fetcher = fetch) {
           });
           if (!r.ok) return reply({ ok: false, message: 'Account maken lukt niet. Controleer de gegevens of kies Aanmelden als je al een account hebt.' });
           if (!r.data.access_token) return reply({ ok: true, confirmation: true, message: 'Controleer je e-mail en bevestig je account. Meld je daarna aan om deze voortgang te koppelen.' });
-          return reply({ ...await progress(r.data.access_token, input.profile || null), ...session(r.data) });
+          return reply({ ...await list(r.data.access_token), ...session(r.data) });
         }
         const lookup = await call('/rest/v1/rpc/tb_lookup_username', { wanted: username }, null, true);
         const email = lookup.ok && typeof lookup.data === 'string' ? lookup.data : null;
@@ -70,7 +74,7 @@ export function createHandler(config, fetcher = fetch) {
         // Ook onbekende gebruikers door Auth laten controleren; de fout blijft gelijk.
         const r = await call('/auth/v1/token?grant_type=password', { email: email || 'unknown-' + crypto.randomUUID() + '@invalid.example', password: input.password });
         if (!r.ok || !email) return reply({ ok: false, message: 'Aanmelden lukt niet. Controleer gebruikersnaam, wachtwoord en e-mailbevestiging.' });
-        return reply({ ...await progress(r.data.access_token, input.profile || null), ...session(r.data) });
+        return reply({ ...await list(r.data.access_token), ...session(r.data) });
       }
       if (action === 'refresh') {
         if (typeof input.refresh !== 'string' || input.refresh.length > 4096) return reply({ ok: false, authExpired: true, message: 'Meld je opnieuw aan.' });
@@ -86,7 +90,10 @@ export function createHandler(config, fetcher = fetch) {
         const r = await call('/auth/v1/user', { password: input.password }, input.token, false, 'PUT');
         return reply(r.ok ? { ok: true, message: 'Wachtwoord gewijzigd. Meld je opnieuw aan in Tafelberg.' } : { ok: false, message: 'Herstellen lukt niet. Vraag een nieuwe herstelmail aan.' });
       }
-      return reply(await progress(input.token, action === 'write' ? input.profile : null, Number.isSafeInteger(input.revision) ? input.revision : 0));
+      if (action === 'resume' || action === 'list') return reply(await list(input.token));
+      if (action !== 'create' && (typeof input.player !== 'string' || !/^p[a-zA-Z0-9]{1,100}$/.test(input.player))) return reply({ ok: false, message: 'Kies een klimmer.' }, 400);
+      return reply(await progress(input.token, action === 'write' || action === 'create' ? input.profile || null : null,
+        Number.isSafeInteger(input.revision) ? input.revision : 0, input.player || null, action === 'create', input.changeId || null));
     } catch {
       // Geen wachtwoorden, tokens of interne foutmeldingen in logs of antwoorden.
       return reply({ ok: false, message: 'Online bewaren lukt nu niet. Je lokale voortgang blijft behouden.' }, 503);
