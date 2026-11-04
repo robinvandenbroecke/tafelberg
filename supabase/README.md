@@ -1,6 +1,6 @@
 # Tafelberg: Supabase-aanmelding en voortgang
 
-Status: werkversie, niet actief. `cloud-config.js` bevat bewust geen adres. De productie-app verandert pas nadat de echte database, Auth, mail en beide transports zijn gecontroleerd.
+Status: werkversie, niet actief. `cloud-config.js` bevat bewust geen adres. Database, Edge Function en SMTP zijn ingericht. De productie-app verandert pas nadat de echte Auth- en mailproeven zijn afgerond.
 
 ## Wat de speler ziet
 
@@ -59,4 +59,6 @@ Gratis projecten kunnen na ongeveer een week met weinig activiteit worden gepauz
 
 Project `tafelberg` (`sjzbgdhxtibnbyutlyas`) is aangemaakt in de organisatie Tafelberg, Frankfurt, tegen de bevestigde prijs van €0/maand. Alle drie migraties zijn toegepast en Edge Function `tafelberg` versie 2 is actief. De derde migratie voegt meerdere klimmers per account toe en behoudt bestaande profielen. Een teruggedraaide testtransactie op de echte database bevestigt twee onafhankelijke klimmers bij één account, geen duplicaat na herhaalde aanmaak en geen zichtbaarheid vanuit een tweede account. Zowel Security als Performance Advisors melden geen waarschuwingen. Een transactie met twee tijdelijke testaccounts bevestigt op de echte database dat de ingelogde gebruiker alleen zijn eigen profiel ziet en dat anoniem synchroniseren niet mag; de transactie is teruggedraaid. De Security Advisor meldt geen waarschuwingen na het verplaatsen van de schrijfimplementatie naar het privéschema. De publieke wrapper heeft geen verhoogde privileges.
 
-Auth-redirects, minimum wachtwoordlengte, SMTP en echte Auth-/mailtests moeten nog worden afgerond via het dashboard. Het publieke functieadres wordt pas daarna ingevuld; de online-knoppen zijn dus nog niet geactiveerd in de app. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
+Auth Site URL en de exacte redirect zijn ingesteld op `https://robinvandenbroecke.github.io/tafelberg/`. De minimumwachtwoordlengte is twaalf tekens; e-mailbevestiging staat aan en anonieme aanmelding staat uit. Eigen SMTP via Brevo is opgeslagen en na herladen gecontroleerd: `smtp-relay.brevo.com`, poort 587, afzendernaam Tafelberg en een bij Brevo geverifieerde afzender. Het bestaande Gmail-afzenderadres heeft nog geen eigen geauthenticeerd domein; Brevo meldt hiervoor een aanbeveling voor betere afleverbaarheid. De SMTP-sleutel staat uitsluitend in de beveiligde Supabase-configuratie en hoort niet in deze repository.
+
+Echte e-mailbevestiging, aanmelden en wachtwoordherstel moeten nog worden gecontroleerd met een tijdelijk testaccount en een afgesproken ontvanger. Er is nog geen testaccount aangemaakt. Het publieke functieadres wordt pas daarna ingevuld; de online-knoppen zijn nog niet geactiveerd. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
