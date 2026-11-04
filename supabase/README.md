@@ -1,6 +1,6 @@
 # Tafelberg: Supabase-aanmelding en voortgang
 
-Status: werkversie, niet actief. `cloud-config.js` bevat bewust geen adres. Database, Edge Function en SMTP zijn ingericht. De productie-app verandert pas nadat de echte Auth- en mailproeven zijn afgerond.
+Status: geconfigureerd en gecontroleerd voor publicatie. `cloud-config.js` bevat uitsluitend het publieke functieadres. Database, Edge Function, Auth en Brevo SMTP zijn ingericht. De echte bevestigings-, aanmeld-, mail- en synchronisatieproeven zijn afgerond.
 
 ## Wat de speler ziet
 
@@ -61,4 +61,6 @@ Project `tafelberg` (`sjzbgdhxtibnbyutlyas`) is aangemaakt in de organisatie Taf
 
 Auth Site URL en de exacte redirect zijn ingesteld op `https://robinvandenbroecke.github.io/tafelberg/`. De minimumwachtwoordlengte is twaalf tekens; e-mailbevestiging staat aan en anonieme aanmelding staat uit. Eigen SMTP via Brevo is opgeslagen en na herladen gecontroleerd: `smtp-relay.brevo.com`, poort 587, afzendernaam Tafelberg en een bij Brevo geverifieerde afzender. Het bestaande Gmail-afzenderadres heeft nog geen eigen geauthenticeerd domein; Brevo meldt hiervoor een aanbeveling voor betere afleverbaarheid. De SMTP-sleutel staat uitsluitend in de beveiligde Supabase-configuratie en hoort niet in deze repository.
 
-Na expliciete toestemming is een tijdelijk account `tafelberg_test` aangemaakt. Supabase bevestigt het verzenden van de registratie- en herstelmail; Brevo toont voor beide de status **Delivered**. Aanmelden met het juiste wachtwoord vóór e-mailbevestiging wordt geweigerd. De bevestigingslink moet nog door de ontvanger worden geopend; daarna volgen de echte aanmeld-/synchronisatiecontrole en het verwijderen van het testaccount. Het publieke functieadres wordt pas daarna ingevuld; de online-knoppen zijn nog niet geactiveerd. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
+Met een goedgekeurd tijdelijk account zijn de echte diensten gecontroleerd. Supabase verzond de registratie- en herstelmail; Brevo bevestigt beide als **Delivered**. Aanmelden vóór e-mailbevestiging wordt geweigerd. Na bevestiging via de ontvangen link slagen aanmelding met gebruikersnaam en wachtwoord, twee onafhankelijke klimmers, bescherming tegen oudere uploads, sessieverversing, wachtwoordwijziging (oud wachtwoord geweigerd, nieuw wachtwoord geaccepteerd) en afmelden (refreshsessie ingetrokken). De verzending van de herstelmail is echt getest; het openen van de herstelpagina is daarnaast in de browsertests gecontroleerd.
+
+Het tijdelijke account, de twee testklimmers, de resterende testsessies en de lokale tijdelijke testcredentials zijn verwijderd. De databasecontrole bevestigt nul achtergebleven testgebruikers, testprofielen en testsessies. Het publieke functieadres is nu ingevuld voor activering van de online-knoppen. De privé-tabellen hebben expliciete deny-policies, naast ontbrekende directe tabelrechten voor gewone gebruikers.
