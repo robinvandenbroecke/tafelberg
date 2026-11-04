@@ -10,7 +10,7 @@ async function backend(){
   const u=new URL(url),data=opts.body?JSON.parse(opts.body):null,token=opts.headers.Authorization.replace(/^Bearer /,'');authCalls.push({path:u.pathname,admin:opts.headers.apikey==='server-secret'});
   if(u.pathname==='/auth/v1/signup'){
    if(users[data.email])return response({message:'exists'},400);
-   const id=data.data.username==='alice'?A:data.data.username==='bob'?B:crypto.randomUUID();
+   const id=data.email==='alice@example.test'?A:data.email==='bob@example.test'?B:crypto.randomUUID();
    if(id!==A&&id!==B)await f.db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3::jsonb)',[id,data.email,JSON.stringify(data.data)]);
    const user={id,email:data.email,password:data.password};users[data.email]=user;
    return response(settings.confirmation?{user:{id:user.id}}:session(user));
@@ -80,6 +80,12 @@ async function test(){
  assert(!JSON.stringify(r.data).includes('server-secret'));assert(!JSON.stringify(r.data).includes('New-password-123'));
  r=await b.rpc({action:'logout',token:alice.token});assert(r.data.ok);
  r=await b.rpc({action:'read',token:alice.token});assert(r.data.authExpired);
+ // Nieuwe accounts hebben alleen e-mail en wachtwoord; bestaande namen blijven compatibel.
+ r=await b.rpc({action:'register',email:'email-only@example.test',password:'Email-password-123'});assert(r.data.ok);assert.equal(r.data.email,'email-only@example.test');const emailOnly=r.data;
+ r=await b.rpc({action:'login',email:' EMAIL-ONLY@EXAMPLE.TEST ',password:'Email-password-123'});assert(r.data.ok);assert.equal(r.data.account,emailOnly.account);
+ r=await b.rpc({action:'login',email:'missing@example.test',password:'wrong'});assert.equal(r.data.message,failure);
+ r=await b.rpc({action:'recover',email:'email-only@example.test'});assert.equal(r.data.message,recovery);
+ r=await b.rpc({action:'login',email:'bad',password:'wrong'});assert.equal(r.status,400);
  r=await b.rpc({action:'register',username:'tiny',email:'bad',password:'123'});assert.equal(r.status,400);
  console.log('Supabase Edge: aanmelden, wachtwoorden, verversen, eigenaarcontrole, herstel, CORS, afmelden en foutmeldingen geslaagd.');
  }finally{await b.db.close();}

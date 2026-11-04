@@ -29,22 +29,20 @@ async function main(){
   }
   async function local(p,name,stars){await p.getByRole('textbox',{name:'Naam',exact:true}).fill(name);await p.getByRole('button',{name:'Start de klim',exact:true}).click();await p.evaluate(stars=>{const a=Tafelberg.profile();a.settings.sound=false;a.settings.voice=false;a.stats.stars=stars;Tafelberg.save();},stars);}
   async function form(p,mode,name,password,options={}){
-   await p.evaluate(mode=>Tafelberg.go('cloud',{mode}),mode);await p.getByRole('textbox',{name:'Gebruikersnaam',exact:true}).fill(name);await p.getByLabel('Wachtwoord',{exact:true}).fill(password);
+   await p.evaluate(mode=>Tafelberg.go('cloud',{mode}),mode);await p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill(name+'@example.test');assert.equal(await p.getByLabel('Gebruikersnaam',{exact:true}).count(),0);await p.getByLabel('Wachtwoord',{exact:true}).fill(password);
    if(mode==='register'){
-    await p.getByLabel('Herhaal wachtwoord',{exact:true}).fill(password);
-    await p.getByRole('textbox',{name:'Herstel-e-mailadres',exact:true}).fill(name+'@example.test');
     if(options.empty)await p.getByRole('combobox',{name:'Voortgang bij account maken',exact:true}).selectOption('');
    }
-   await p.getByRole('button',{name:mode==='register'?'Account maken en bewaren':'Aanmelden',exact:true}).click();
+   await p.getByRole('button',{name:mode==='register'?'Account maken':'Aanmelden',exact:true}).click();
    if(mode==='register'&&b.settings.confirmation){
-    await p.getByRole('status').filter({hasText:'Controleer je e-mail'}).waitFor();
+    await p.getByRole('status').filter({hasText:'Bevestig je account'}).waitFor();
     assert.equal(await p.evaluate(()=>Tafelberg.profile().name),name==='alice'?'Alice':'Bob');
     b.settings.confirmation=false;
     await p.getByRole('button',{name:'Account bevestigd? Aanmelden',exact:true}).click();
     await p.getByLabel('Wachtwoord',{exact:true}).fill(password);
     await p.getByRole('button',{name:'Aanmelden',exact:true}).click();
    }
-   await p.getByRole('heading',{name:'Account van '+name,exact:true}).waitFor();
+   await p.getByRole('heading',{name:name+'@example.test',exact:true}).waitFor();
   }
   async function settled(p){try { await p.waitForFunction(()=>{const m=JSON.parse(localStorage.getItem('tafelberg.supabase.v2')),a=m.links[Tafelberg.state().current];return a&&!a.dirty;},null,{timeout:15000}); } catch(e) {console.error(await p.evaluate(()=>({body:document.body.innerText,links:JSON.parse(localStorage.getItem('tafelberg.supabase.v2')).links,current:Tafelberg.state().current})));throw e;} }
   async function play(p,name){await p.getByRole('button',{name:'Spelen met '+name,exact:true}).click();await settled(p);}
@@ -55,12 +53,20 @@ async function main(){
    await p.getByRole('combobox',{name:'Opslaan als',exact:true}).selectOption(target);
    await p.getByRole('button',{name:'Voortgang toevoegen',exact:true}).click();await settled(p);
   }
-  const a=await device();await local(a.p,'Alice',15);b.settings.confirmation=true;await form(a.p,'register','alice','Alice-password-123');await settled(a.p);
+  const a=await device();
+  await a.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).click();
+  await a.p.getByRole('heading',{name:'Aanmelden',exact:true}).waitFor();
+  assert.equal(await a.p.getByRole('textbox',{name:'E-mailadres',exact:true}).count(),1);
+  await a.p.getByRole('button',{name:'Terug',exact:true}).click();
+  await local(a.p,'Alice',15);b.settings.confirmation=true;await form(a.p,'register','alice','Alice-password-123');await settled(a.p);
   await a.p.getByRole('button',{name:'Spelen met Alice',exact:true}).waitFor();
   const hector=await a.p.evaluate(()=>Tafelberg.state().current);
+  await a.p.evaluate(()=>Tafelberg.go('home'));
+  await a.p.getByRole('button',{name:'Mijn account',exact:true}).click();
+  await a.p.getByRole('heading',{name:'alice@example.test',exact:true}).waitFor();
   await a.p.evaluate(()=>Tafelberg.go('newPlayer'));await local(a.p,'Basil',7);await account(a.p);await upload(a.p,'Basil');
   const basil=await a.p.evaluate(()=>Tafelberg.state().current);assert.notEqual(basil,hector);
-  let online=(await b.rpc({action:'login',username:'alice',password:'Alice-password-123'})).data;
+  let online=(await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data;
   assert.equal(online.profiles.length,2);assert.deepEqual(online.profiles.map(p=>p.profile.stats.stars).sort((a,b)=>a-b),[7,15]);
   // Een tweede toestel haalt alle kinderen met één ouderaccount op.
   const d=await device();await form(d.p,'login','alice','Alice-password-123');await play(d.p,'Alice');
@@ -93,26 +99,26 @@ async function main(){
   for(let i=0;i<100&&!hold.deliver;i++)await new Promise(r=>setTimeout(r,20));assert(hold.deliver);
   await a.p.evaluate(()=>Tafelberg.go('cloud',{mode:'recover'}));
   const beforeRecovery=await a.p.evaluate(()=>window.completedCloud);await hold.deliver();hold=null;await a.p.waitForFunction(n=>window.completedCloud>n,beforeRecovery);
-  await a.p.getByRole('heading',{name:'Wachtwoord vergeten',exact:true}).waitFor();await a.p.getByRole('textbox',{name:'Gebruikersnaam',exact:true}).fill('alice');await a.p.getByRole('button',{name:'Herstelmail versturen',exact:true}).click();await a.p.getByRole('status').filter({hasText:'Als dit account bestaat'}).waitFor();
+  await a.p.getByRole('heading',{name:'Wachtwoord vergeten',exact:true}).waitFor();await a.p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill('alice@example.test');await a.p.getByRole('button',{name:'Herstelmail versturen',exact:true}).click();await a.p.getByRole('status').filter({hasText:'Als dit account bestaat'}).waitFor();
   // Aanmelden doet op zichzelf geen upload. De gebruiker kiest de lokale bron en het kind.
   const e=await device();await local(e.p,'Lokale Alice',80);await form(e.p,'login','alice','Alice-password-123');
-  assert.equal((await b.rpc({action:'login',username:'alice',password:'Alice-password-123'})).data.profiles.find(p=>p.user===hector).profile.stats.stars,50);
+  assert.equal((await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data.profiles.find(p=>p.user===hector).profile.stats.stars,50);
   await upload(e.p,'Lokale Alice',hector);assert.equal(await e.p.evaluate(()=>Tafelberg.profile().stats.stars),80);assert.equal(await e.p.evaluate(()=>Tafelberg.state().order.length),2);
   // Minder lokale voortgang blijft afzonderlijk bewaard; Basil wordt niet teruggezet.
   const low=await device();await local(low.p,'Beginnende Basil',5);await form(low.p,'login','alice','Alice-password-123');await upload(low.p,'Beginnende Basil',basil);
   assert.equal(await low.p.evaluate(()=>Tafelberg.profile().stats.stars),7);assert.equal(await low.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name==='Beginnende Basil').stats.stars),5);
   const skip=await device();await local(skip.p,'Apart houden',100);await form(skip.p,'login','alice','Alice-password-123');await play(skip.p,'Basil');
   assert.equal(await skip.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name==='Apart houden').stats.stars),100);
-  online=(await b.rpc({action:'login',username:'alice',password:'Alice-password-123'})).data;
+  online=(await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data;
   assert.equal(online.profiles.length,2);assert.equal(online.profiles.find(p=>p.user===hector).profile.stats.stars,80);assert.equal(online.profiles.find(p=>p.user===basil).profile.stats.stars,7);
   // Een nieuw gezinsaccount mag leeg beginnen; een kind heeft geen eigen e-mailadres nodig.
   const fresh=await device();await local(fresh.p,'Bewaar lokaal',90);await form(fresh.p,'register','fresh','Fresh-password-123',{empty:true});
-  assert.equal((await b.rpc({action:'login',username:'fresh',password:'Fresh-password-123'})).data.profiles.length,0);
+  assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-password-123'})).data.profiles.length,0);
   await fresh.p.getByRole('textbox',{name:'Naam van nieuwe klimmer',exact:true}).fill('Dolores');await fresh.p.getByRole('button',{name:'Nieuwe klimmer maken',exact:true}).click();
   await fresh.p.getByRole('button',{name:'Spelen met Dolores',exact:true}).waitFor();await settled(fresh.p);assert.equal(await fresh.p.evaluate(()=>Tafelberg.profile().stats.stars),0);
   assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name==='Bewaar lokaal').stats.stars),90);
   for(const dev of [e,low,skip,fresh]){assert.deepEqual(dev.p.errors,[]);await dev.c.close();}
-  const login=await b.rpc({action:'login',username:'alice',password:'Alice-password-123'});
+  const login=await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'});
   await a.p.goto('http://127.0.0.1:'+server.address().port+'/#type=recovery&access_token='+login.data.token+'&refresh_token='+login.data.refresh+'&expires_in=3600');
   await a.p.reload();
   await a.p.getByRole('heading',{name:'Nieuw wachtwoord kiezen',exact:true}).waitFor();

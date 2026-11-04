@@ -1568,3 +1568,8 @@ html.phone .chart-row .cell, html.phone .chart-t { margin-top: 0; margin-bottom:
 .cloud-entry { min-width: 44px; min-height: 44px; padding: 0.25rem; }
 .cloud-card textarea { max-width: 100%; overflow-wrap: anywhere; }
 html.phone .who-main > .btn { font-size: 1rem; min-height: 44px; margin-top: 6px; }
+
+/* Een zichtbare accountknop zonder extra ruimte in de spelrondes. */
+.home > .btn { flex: 0 0 auto; min-height: 44px; margin: 0.35rem 1.4rem 0; padding: 0.35rem 0.7rem; font-size: 1rem; }
+.np-card > .btn { width: 100%; min-height: 44px; margin-bottom: 0.7rem; }
+.cloud-card h2 { overflow-wrap: anywhere; word-break: break-word; }

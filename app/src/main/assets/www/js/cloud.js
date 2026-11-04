@@ -82,6 +82,7 @@
   function absorb(result, account) {
     if (!result || result.account !== account || !Array.isArray(result.profiles) || result.profiles.length > 50) throw new Error('Ongeldige accountgegevens.');
     for (var i = 0; i < result.profiles.length; i++) install(result.profiles[i], account, false);
+    if (typeof result.email === 'string') meta.sessions[account].email = result.email;
     meta.sessions[account].checked = Date.now(); persist();
   }
   function redraw(account) { if (api.current().name === 'cloud' && ui && ui.mode === 'account' && ui.account === account) show(document.getElementById('app'), { mode: 'account', account: account, cached: true }); }
@@ -166,8 +167,9 @@
     if (!safe()) { pendingLogin = { result: result, source: sourceId }; schedule(); return; }
     if (!result.account || !/^[a-f0-9-]{36}$/.test(result.account)) throw new Error('Ongeldig accountantwoord.');
     var account = result.account;
-    meta.sessions[account] = { username: result.username, token: result.token, refresh: result.refresh, expires: result.expires, checked: Date.now(), message: 'Aangemeld.' };
-    absorb(result, account); meta.lastUsername = result.username;
+    meta.sessions[account] = { username: result.username, email: result.email || '', token: result.token, refresh: result.refresh, expires: result.expires, checked: Date.now(), message: 'Aangemeld.' };
+    absorb(result, account); meta.lastEmail = result.email || '';
+    if (meta.pending[result.email]) delete meta.pending[result.email];
     if (meta.pending[result.username]) delete meta.pending[result.username]; persist();
     api.go('cloud', { mode: 'account', account: account, cached: true });
     // Bij registratie heeft de gebruiker deze eerste upload al uitdrukkelijk gekozen.
@@ -211,14 +213,14 @@
     var current = api.state().current, linked = meta.links[current], account = params.account || (linked && linked.account), s;
     if (!account) for (var accountKey in meta.sessions) if (meta.sessions.hasOwnProperty(accountKey)) { account = accountKey; break; }
     s = account && meta.sessions[account];
-    var mode = params.mode || (s ? 'account' : current ? 'register' : 'login');
+    var mode = params.mode || (s ? 'account' : 'login');
     var content = h('div', { class: 'cloud-card' }), status = h('p', { class: 'set-note', role: 'status' });
     ui = { account: account, mode: mode, note: status };
-    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'settings' : 'newPlayer'); }), h('h1', null, 'Online bewaren')]), h('div', { class: 'cloud-main' }, content)]));
+    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'home' : 'newPlayer'); }), h('h1', null, 'Mijn account')]), h('div', { class: 'cloud-main' }, content)]));
     if (!configured()) { content.appendChild(h('p', null, 'Online bewaren is nog niet beschikbaar. Je voortgang blijft op dit toestel.')); return; }
     if (mode === 'account' && s) {
-      content.appendChild(h('h2', null, 'Account van ' + s.username));
-      content.appendChild(h('p', null, 'Eén account, meerdere klimmers. Elke klimmer heeft eigen tafels, sterren en voortgang.'));
+      content.appendChild(h('h2', null, s.email || 'Mijn account'));
+      content.appendChild(h('p', null, 'Alle klimmers, elk met eigen voortgang.'));
       status.textContent = s.message || 'Je voortgang blijft ook lokaal bewaard.'; content.appendChild(status);
       var ids = accountIds(account);
       content.appendChild(h('h3', null, 'Klimmers in dit account'));
@@ -268,48 +270,52 @@
           if (mode === 'reset') { linkSession = null; status.textContent = r.message; finishButton.disabled = true; content.appendChild(button('Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
           try {
             r.token = linkSession.token; r.refresh = linkSession.refresh; r.expires = linkSession.expires;
-            var remembered = meta.pending[r.username]; acceptAccount(r, remembered && remembered.source); linkSession = null;
+            var remembered = meta.pending[r.email] || meta.pending[r.username]; acceptAccount(r, remembered && remembered.source); linkSession = null;
           } catch (e) { status.textContent = 'Niet toegepast: ' + e.message; }
         });
       });
       content.appendChild(finishButton); content.appendChild(status); return;
     }
-    content.appendChild(h('h2', null, mode === 'register' ? 'Een account voor je klimmers' : mode === 'recover' ? 'Wachtwoord vergeten' : 'Account aanmelden'));
-    content.appendChild(h('p', null, 'Een ouderaccount kan meerdere klimmers op verschillende toestellen onthouden. De kinderen hebben geen eigen e-mailadres nodig.'));
-    var username = field('Gebruikersnaam', 'text', 'username'), pass = field('Wachtwoord', 'password', mode === 'login' ? 'current-password' : 'new-password');
-    var confirmPass = field('Herhaal wachtwoord', 'password', 'new-password'), email = field('Herstel-e-mailadres', 'email', 'email');
-    if (meta.lastUsername) username.input.value = meta.lastUsername;
-    content.appendChild(username.node); if (mode !== 'recover') content.appendChild(pass.node);
+    content.appendChild(h('h2', null, mode === 'register' ? 'Account maken' : mode === 'recover' ? 'Wachtwoord vergeten' : 'Aanmelden'));
+    if (mode !== 'recover') content.appendChild(h('p', { class: 'set-note' }, 'Bewaar de voortgang van al je klimmers.'));
+    var email = field('E-mailadres', 'email', 'username'), pass = field('Wachtwoord', 'password', mode === 'login' ? 'current-password' : 'new-password');
+    if (meta.lastEmail) email.input.value = meta.lastEmail;
+    content.appendChild(email.node); if (mode !== 'recover') content.appendChild(pass.node);
     var firstSource = null;
     if (mode === 'register') {
-      content.appendChild(confirmPass.node); content.appendChild(email.node);
-      firstSource = chooser('Voortgang bij account maken', sourceIds(), 'Nog geen lokale voortgang meenemen', current); content.appendChild(firstSource.node);
-      content.appendChild(h('p', { class: 'set-note' }, 'Kies eventueel je eerste lokale klimmer. Na e-mailbevestiging wordt die toegevoegd. Andere klimmers kun je daarna meenemen.'));
+      pass.input.minLength = 12;
+      content.appendChild(h('p', { class: 'set-note' }, 'Wachtwoord: minstens 12 tekens.'));
+      firstSource = chooser('Voortgang bij account maken', sourceIds(), 'Nog geen lokale voortgang meenemen', current);
+      if (sourceIds().length) content.appendChild(firstSource.node);
     }
-    var submit = button(mode === 'register' ? 'Account maken en bewaren' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden', function () {
+    var submit = button(mode === 'register' ? 'Account maken' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden', function () {
       if (submit.disabled) return;
-      var u = username.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
-      if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(u) || u === 'constructor' || u === 'prototype') { status.textContent = 'Gebruik 3 tot 30 letters, cijfers, - of _.'; return; }
+      var u = email.input.value.toLowerCase().replace(/^\\s+|\\s+$/g, '');
+      if (u.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(u)) { status.textContent = 'Vul een geldig e-mailadres in.'; return; }
       if (mode !== 'recover' && !pass.input.value.length) { status.textContent = 'Vul je wachtwoord in.'; return; }
-      if (mode === 'register' && (pass.input.value.length < 12 || pass.input.value !== confirmPass.input.value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.input.value))) { status.textContent = 'Controleer je e-mailadres en gebruik twee gelijke wachtwoorden van minstens 12 tekens.'; return; }
+      if (mode === 'register' && pass.input.value.length < 12) { status.textContent = 'Gebruik minstens 12 tekens.'; return; }
       var source = mode === 'register' ? firstSource.input.value || null : meta.pending[u] && meta.pending[u].source;
-      var request = { action: mode, username: u };
+      var request = { action: mode, email: u };
       if (mode !== 'recover') request.password = pass.input.value;
-      if (mode === 'register') request.email = email.input.value;
-      pass.input.value = ''; confirmPass.input.value = ''; submit.disabled = true; status.textContent = 'Even verbinden…';
+      pass.input.value = ''; submit.disabled = true; status.textContent = 'Even verbinden…';
       transport(request, function (r) {
         submit.disabled = false; if (!r.ok) { status.textContent = r.message || 'Aanmelden lukt nu niet.'; return; }
         if (mode === 'recover') { status.textContent = r.message; return; }
-        if (r.confirmation) { meta.pending[u] = { source: source }; meta.lastUsername = u; persist(); status.textContent = r.message; content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
+        if (r.confirmation) { meta.pending[u] = { source: source }; meta.lastEmail = u; persist(); status.textContent = r.message; content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
         try { acceptAccount(r, source); } catch (e) { status.textContent = 'Niet toegepast: ' + e.message; }
       });
     });
+    function enter(e) { if ((e.keyCode || e.which) === 13) { e.preventDefault(); submit.click(); } }
+    email.input.addEventListener('keydown', enter, false); pass.input.addEventListener('keydown', enter, false);
+    submit.className = 'btn btn-sun';
     content.appendChild(submit); content.appendChild(status);
     if (mode !== 'login') content.appendChild(button('Ik heb al een account', function () { api.go('cloud', { mode: 'login' }); }));
-    if (mode === 'login') { content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); })); content.appendChild(button('Nieuw account maken', function () { api.go('cloud', { mode: 'register' }); })); }
+    if (mode === 'login') { content.appendChild(button('Account maken', function () { api.go('cloud', { mode: 'register' }); })); content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); })); }
+
   }
   window.TBCloud = {
     configured: configured,
+    signedIn: function () { for (var id in meta.sessions) if (meta.sessions.hasOwnProperty(id)) return true; return false; },
     linked: function (id) { return !!meta.links[id]; },
     detach: function (id) { delete meta.links[id]; persist(); },
     init: function (app, dom) {
