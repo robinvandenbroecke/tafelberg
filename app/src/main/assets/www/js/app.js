@@ -88,7 +88,7 @@
     };
   }
 
-  function defaultSettings() { return { tables: [2, 5, 10], len: 12, div: false, sound: true, vibrate: false, auto: true, pace: 'auto', tempo: true, goal: 'gewoon', voice: true }; }
+  function defaultSettings() { return { tables: [2, 5, 10], excludedTables: [], len: 12, div: false, sound: true, vibrate: false, auto: true, pace: 'auto', tempo: true, goal: 'gewoon', voice: true }; }
 
   function defaultStore() { return { v: 2, device: { eink: null }, current: null, order: [], profiles: {} }; }
 
@@ -135,6 +135,10 @@
       if (!p) continue;
       p.settings = fill(p.settings || {}, defaultSettings());
       if (!p.settings.tables || !p.settings.tables.length) p.settings.tables = [2];
+      // Een ouderkeuze blijft gelden, ook als automatische uitbreiding aanstaat.
+      p.settings.excludedTables = (Array.isArray(p.settings.excludedTables) ? p.settings.excludedTables : []).filter(function (t, index, list) {
+        return typeof t === 'number' && t >= 1 && t <= 10 && t % 1 === 0 && list.indexOf(t) === index && p.settings.tables.indexOf(t) < 0;
+      });
       p.facts = p.facts || {};
       p.stats = fill(p.stats || {}, defaultStats());
       keep.push(p.id);
@@ -1043,7 +1047,7 @@
   }
 
   // ---------- gedeelde keuzelijsten
-  function tableChooser(list, onChange) {
+  function tableChooser(list, onChange, excluded) {
     var wrap = h('div', { class: 'table-chips' });
     function draw() {
       wrap.innerHTML = '';
@@ -1054,8 +1058,15 @@
             class: 'tchip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'aria-label': 'Tafel van ' + tt,
             onclick: function () {
               var idx = list.indexOf(tt);
-              if (idx >= 0) { if (list.length > 1) list.splice(idx, 1); }
-              else { list.push(tt); list.sort(function (x, y) { return x - y; }); }
+              if (idx >= 0) {
+                if (list.length > 1) {
+                  list.splice(idx, 1);
+                  if (excluded && excluded.indexOf(tt) < 0) excluded.push(tt);
+                }
+              } else {
+                list.push(tt); list.sort(function (x, y) { return x - y; });
+                if (excluded && excluded.indexOf(tt) >= 0) excluded.splice(excluded.indexOf(tt), 1);
+              }
               if (onChange) onChange();
               draw();
             }
@@ -1727,7 +1738,7 @@
     }
     if (!total || good / total < pace().unlock) return null;
     for (var j = 0; j < ORDER.length; j++) {
-      if (st.tables.indexOf(ORDER[j]) < 0) {
+      if (st.tables.indexOf(ORDER[j]) < 0 && st.excludedTables.indexOf(ORDER[j]) < 0) {
         st.tables.push(ORDER[j]);
         st.tables.sort(function (x, y) { return x - y; });
         return ORDER[j];
@@ -2209,7 +2220,6 @@
       return out;
     }
     var pool = knownPool(pr.settings.tables);
-    if (pool.length < SPRINT_MIN) pool = knownPool([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     current.back = function () { go('speed'); };
     var stars = starBadge(stats.stars);
@@ -3060,6 +3070,13 @@
       check(p.settings, defaultSettings()); check(p.stats, defaultStats());
       if (!Array.isArray(p.settings.tables) || !p.settings.tables.length || p.settings.tables.length > 10 || [8,12,16,20].indexOf(p.settings.len) < 0) throw new Error('Ongeldige instellingen.');
       for (var t = 0; t < p.settings.tables.length; t++) if (typeof p.settings.tables[t] !== 'number' || p.settings.tables[t] < 1 || p.settings.tables[t] > 10 || p.settings.tables[t] % 1) throw new Error('Ongeldige tafel.');
+      if (p.settings.excludedTables !== undefined) {
+        if (!Array.isArray(p.settings.excludedTables) || p.settings.excludedTables.length > 10) throw new Error('Ongeldige uitgezette tafels.');
+        for (var ex = 0; ex < p.settings.excludedTables.length; ex++) {
+          var et = p.settings.excludedTables[ex];
+          if (typeof et !== 'number' || et < 1 || et > 10 || et % 1) throw new Error('Ongeldige uitgezette tafel.');
+        }
+      }
       if (p.stats.lm) check(p.stats.lm, defaultLm());
       if (p.settings.pace !== undefined && ['auto','rustig','gewoon','snel'].indexOf(p.settings.pace) < 0) throw new Error('Ongeldig leertempo.');
       if (p.settings.goal !== undefined && ['klein','gewoon','groot'].indexOf(p.settings.goal) < 0) throw new Error('Ongeldig dagdoel.');
@@ -3253,8 +3270,8 @@
           h('h2', { class: 'set-head' }, [avatar(pr), headName]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, h('span', { class: 'set-label' }, 'Naam')), nameInput]),
           h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Kleur'), colorChooser(function () { return pr.color; }, function (c) { pr.color = c; saveState(); })]),
-          h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Tafels bij Oefenen'), h('span', { class: 'set-note' }, 'Kies de tafels die in de klas al aan bod kwamen.'), tableChooser(st.tables, saveState)]),
-          toggle('Nieuwe tafels vanzelf erbij', 'Zodra de gekozen tafels goed zitten, komt de volgende erbij, in deze volgorde: 2, 10, 5, 1, 4, 3, 6, 8, 9, 7.', function () { return !!st.auto; }, function (v) { st.auto = v; }),
+          h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Tafels bij Oefenen en Sprint'), h('span', { class: 'set-note' }, 'Kies de tafels die in de klas al aan bod kwamen. Minstens één tafel blijft aan. Een tafel die je uitzet, blijft uit totdat je ze zelf weer kiest.'), tableChooser(st.tables, saveState, st.excludedTables)]),
+          toggle('Nieuwe tafels vanzelf erbij', 'Zodra de gekozen tafels goed zitten, komt de volgende erbij, in deze volgorde: 2, 10, 5, 1, 4, 3, 6, 8, 9, 7. Handmatig uitgezette tafels worden overgeslagen.', function () { return !!st.auto; }, function (v) { st.auto = v; }),
           h('div', { class: 'set-block' }, [h('span', { class: 'set-label' }, 'Leertempo'), paceNote, paceWrap]),
           toggle('Bliksembalk', 'Een balk die leegloopt bij sommen die al begrepen zijn. Niet bij nieuwe sommen en niet op e-ink.', function () { return st.tempo !== false; }, function (v) { st.tempo = v; }),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, h('span', { class: 'set-label' }, 'Sommen per ronde')), lenWrap]),
