@@ -18,6 +18,7 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.util.ReflectionHelpers;
 
 import static org.junit.Assert.*;
 
@@ -46,7 +47,9 @@ public class SafeAreaTest {
                     .setInsets(WindowInsets.Type.systemBars(), Insets.of(left, top, right, bottom))
                     .setVisible(WindowInsets.Type.systemBars(), true).build();
         }
-        return new WindowInsets(new Rect(left, top, right, bottom));
+        // De oude platformconstructor staat niet in de openbare compile-SDK 35.
+        return ReflectionHelpers.callConstructor(WindowInsets.class,
+                ReflectionHelpers.ClassParameter.from(Rect.class, new Rect(left, top, right, bottom)));
     }
 
     private void layout(int width, int height) {
