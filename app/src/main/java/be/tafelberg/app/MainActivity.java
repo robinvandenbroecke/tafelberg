@@ -16,6 +16,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.Locale;
+import java.net.URL;
+import java.net.HttpURLConnection;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+import org.json.JSONObject;
 
 /**
  * Toont het spel (assets/www) schermvullend in een WebView.
@@ -27,6 +38,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
+    private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -67,6 +79,7 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Store(getSharedPreferences("tafelberg", MODE_PRIVATE)), "AndroidStore");
         startSpeech();
         web.addJavascriptInterface(new Speech(), "AndroidSpeech");
+        web.addJavascriptInterface(new Sync(), "AndroidSync");
         web.setWebViewClient(new WebViewClient() {
             @SuppressWarnings("deprecation")
             @Override
@@ -154,6 +167,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        syncExecutor.shutdownNow();
         if (tts != null) {
             tts.shutdown();
             tts = null;
@@ -192,6 +206,72 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean ready() {
             return ttsReady;
+        }
+    }
+
+    /** Alleen het meegeleverde Supabase-functieadres mag verzoeken ontvangen.
+     * Externe WebView-navigatie en universele file://-toegang blijven geblokkeerd. */
+    final class Sync {
+        private final String endpoint;
+        Sync() {
+            String result = "";
+            try (InputStream in = getAssets().open("www/js/cloud-config.js")) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                StringBuilder source = new StringBuilder(); String line;
+                while ((line = reader.readLine()) != null) source.append(line);
+                Matcher match = Pattern.compile("TB_CLOUD_URL\\s*=\\s*'([^']*)'").matcher(source.toString());
+                if (match.find()) result = match.group(1);
+            } catch (Exception ignored) { }
+            endpoint = result;
+        }
+        @JavascriptInterface
+        public void request(final String url, final String id, final String body) {
+            if (id == null || !id.matches("r[0-9]{1,12}")) return;
+            if (body == null || body.length() > 120000 || endpoint.isEmpty() || !endpoint.equals(url)
+                || !endpoint.matches("https://[a-z0-9-]+\\.supabase\\.co/functions/v1/tafelberg")) {
+                reply(id, "{\"ok\":false,\"message\":\"Online bewaren is niet beschikbaar.\"}"); return;
+            }
+            if (syncExecutor.isShutdown()) return;
+            syncExecutor.execute(new Runnable() {
+                @Override public void run() {
+                    String result;
+                    try {
+                        HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
+                        try {
+                            conn.setConnectTimeout(15000); conn.setReadTimeout(25000);
+                            conn.setInstanceFollowRedirects(false); conn.setRequestMethod("POST");
+                            conn.setDoOutput(true); conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                            conn.setFixedLengthStreamingMode(bytes.length);
+                            try (java.io.OutputStream out = conn.getOutputStream()) { out.write(bytes); }
+                            int status = conn.getResponseCode();
+                            if (status >= 300 && status < 400) throw new IllegalStateException("Omleiding geweigerd");
+                            InputStream response = status < 400 ? conn.getInputStream() : conn.getErrorStream();
+                            if (response == null) throw new IllegalStateException("Geen antwoord");
+                            StringBuilder text = new StringBuilder();
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(response, StandardCharsets.UTF_8))) {
+                                char[] part = new char[4096]; int length;
+                                while ((length = reader.read(part)) != -1) {
+                                    text.append(part, 0, length);
+                                    if (text.length() > 200000) throw new IllegalStateException("Antwoord te groot");
+                                }
+                            }
+                            result = new JSONObject(text.toString()).toString();
+                        } finally { conn.disconnect(); }
+                    } catch (Exception ignored) {
+                        result = "{\"ok\":false,\"message\":\"Geen verbinding. Je voortgang blijft op dit toestel.\"}";
+                    }
+                    reply(id, result);
+                }
+            });
+        }
+        private void reply(final String id, final String json) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    if (web != null) web.evaluateJavascript("window.TBCloud && window.TBCloud.nativeReply("
+                        + JSONObject.quote(id) + "," + json + ");", null);
+                }
+            });
         }
     }
 

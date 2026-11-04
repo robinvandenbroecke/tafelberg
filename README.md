@@ -200,3 +200,7 @@ npm test
 Automatisch gecontroleerd, lokaal en in GitHub Actions: ES5; 480 schermen in Chromium en WebKit op 15 formaten; aanvullend lokaal gesimuleerde schermranden links en rechts; installatievarianten; kopieën; browserterugknop; draaien zonder rondeverlies; file://-APK-terugval; manifest en iconen; offline herladen; ontbrekende audio; wachtende updates; geen herladen in een andere actieve ronde. De volledige Chromium- én WebKit-controle draait tevens in de publicatieworkflow. Echte systeeminstallatie, iOS-audiotoestemming en fysieke safe areas blijven handmatige toestelcontroles.
 
 De offlinecontrole maakt de testserver onbereikbaar en controleert dat de service worker de pagina levert. Chromium gebruikt bovendien `setOffline(true)`. WebKit gebruikt die emulatie niet wegens [Playwright-fout #42775](https://github.com/microsoft/playwright/issues/42775), die ook geldige service-workerantwoorden blokkeert. Een aanvraag naar een niet-gecachet bestand moet in beide browsers mislukken.
+
+### Online bewaren met Supabase (werkversie)
+
+Aanmelding met gebruikersnaam en wachtwoord, meerdere spelers en behoud van offline voortgang is voorbereid op de werkbranch. De koppeling is pas actief na het instellen en testen van een eigen Supabase-project en bevestigings-/herstelmail. Zie [Supabase-configuratie](supabase/README.md). De productieconfiguratie bevat voorlopig bewust geen functieadres.
