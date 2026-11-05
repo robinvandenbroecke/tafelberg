@@ -3361,12 +3361,18 @@
       var candidate = defaultStore(); candidate.profiles[pr.id] = pr; candidate.order = [pr.id]; candidate.current = pr.id;
       return validateBackup(JSON.parse(JSON.stringify(candidate))).profiles[pr.id];
     },
-    cloudImport: function (pr, select) {
+    cloudImport: function (pr, select, mergedIds) {
       var candidate = defaultStore(); candidate.profiles[pr.id] = pr; candidate.order = [pr.id]; candidate.current = pr.id;
       pr = validateBackup(JSON.parse(JSON.stringify(candidate))).profiles[pr.id];
       var next = JSON.parse(JSON.stringify(S));
       if (!next.profiles[pr.id]) next.order.push(pr.id);
       next.profiles[pr.id] = pr; if (select) next.current = pr.id;
+      for (var mi = 0; mergedIds && mi < mergedIds.length; mi++) {
+        var oldId = mergedIds[mi];
+        if (oldId === pr.id || !next.profiles[oldId]) continue;
+        delete next.profiles[oldId]; next.order.splice(next.order.indexOf(oldId), 1);
+        if (next.current === oldId) next.current = pr.id;
+      }
       var raw = JSON.stringify(next), b = bridge();
       if (b) b.set(raw); else window.localStorage.setItem(STORE_KEY, raw);
       S = next; saveState(); return pr.id;

@@ -71,14 +71,25 @@
     try { persist(); } catch (e) { /* De afzonderlijke spelopslag blijft bestaan. */ }
     schedule();
   }
-  function install(row, account, select) {
+  function install(row, account, select, sent) {
     if (!row || !row.profile || row.user !== row.profile.id || row.account && row.account !== account) throw new Error('Ongeldige klimmer.');
-    var remote = api.cloudNormalize(row.profile), local = profile(row.user), old = meta.links[row.user];
+    var remote = api.cloudNormalize(row.profile), local = profile(row.user), old = meta.links[row.user], merged = row.merged || [], remove = [];
+    if (!Array.isArray(merged)) throw new Error('Ongeldige samenvoeging.');
     if (old && old.account !== account) throw new Error('Deze klimmer hoort bij een ander account.');
-    var keep = local && (TBProgress.compare(local, remote) > 0 || (old && old.dirty && TBProgress.compare(local, remote) === 0));
+    var base = sent && sent.profile && sent.player === row.user ? sent.profile : old && JSON.parse(old.base);
+    var chosen = TBProgress.reconcile(remote, local, base, !!(sent && sent.player === row.user));
+    for (var i = 0; i < merged.length; i++) {
+      var id = merged[i], link = meta.links[id];
+      // Alleen door deze server bevestigde koppelingen binnen hetzelfde account.
+      if (!link || link.account !== account || id === row.user) continue;
+      var prior = profile(id), priorBase = sent && sent.player === id ? sent.profile : JSON.parse(link.base);
+      chosen = TBProgress.reconcile(chosen, prior, priorBase, !!(sent && sent.player === id));
+      remove.push(id);
+    }
     suppressed = true;
     try {
-      if (!keep) api.cloudImport(remote, !!select); else if (select) api.cloudSelect(row.user);
+      api.cloudImport(chosen, !!select, remove);
+      for (var j = 0; j < remove.length; j++) { delete meta.links[remove[j]]; delete pendingRows[remove[j]]; }
       meta.links[row.user] = { account: account, revision: row.revision, base: snapshot(remote), dirty: snapshot(profile(row.user)) !== snapshot(remote), message: snapshot(profile(row.user)) === snapshot(remote) ? 'Online bewaard.' : 'Voortgang wacht op verzending.' };
       persist();
     } finally { suppressed = false; }
@@ -127,21 +138,22 @@
     select.value = ids.indexOf(initial) >= 0 ? initial : '';
     return { input: select, node: h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, text), select]) };
   }
-  function finishTransfer(result, sourceId, createKey) {
-    var account = result.account, source = sourceId && profile(sourceId), local = profile(result.user), remote = api.cloudNormalize(result.profile), chosen = remote, useSource = false;
+  function finishTransfer(result, sourceId, createKey, sent) {
+    var account = result.account, source = sourceId && profile(sourceId), remote = api.cloudNormalize(result.profile);
     if (!meta.sessions[account]) return;
     if (sourceId && meta.links[sourceId]) throw new Error('Deze lokale klimmer is al gekoppeld.');
-    if (local && TBProgress.compare(local, chosen) > 0) chosen = local;
-    if (source && TBProgress.compare(source, chosen) >= 0) { chosen = clone(source); chosen.id = result.user; useSource = true; }
-    suppressed = true;
-    try {
-      // Eerst bevestigd door de server en duurzaam lokaal bewaren, dan pas de losse bron vervangen.
-      if (useSource) api.cloudReplaceId(sourceId, chosen); else api.cloudImport(chosen, true);
-      meta.links[result.user] = { account: account, revision: result.revision, base: snapshot(remote), dirty: snapshot(profile(result.user)) !== snapshot(remote), message: 'Online bewaard.' };
-      persist();
-    } finally { suppressed = false; }
+    install(result, account, true, sent);
+    // De expliciet gekozen bron is bevestigd. Ook bij minder sterren zijn alle
+    // voorkeuren overgenomen; dezelfde naam blijft geen tweede lokale klimmer.
+    var sameName = source && source.name.replace(/\s+/g, ' ').replace(/^ | $/g, '').toLowerCase() === remote.name.replace(/\s+/g, ' ').replace(/^ | $/g, '').toLowerCase();
+    if (source && (sameName || TBProgress.compare(source, remote) >= 0)) {
+      var chosen = TBProgress.reconcile(profile(result.user), source, sent && sent.profile, true); chosen.id = result.user;
+      suppressed = true;
+      try { api.cloudReplaceId(sourceId, chosen); } finally { suppressed = false; }
+      capture();
+    }
     if (createKey) { delete meta.creates[createKey]; persist(); }
-    note(account, source && !useSource ? 'De accountklimmer staat verder. Die versie blijft behouden; je lokale klimmer is apart bewaard.' : 'De klimmer is toegevoegd. De verste voortgang blijft bewaard.');
+    note(account, 'Klimmer en instellingen bewaard. De verste voortgang blijft behouden.');
     redraw(account); schedule();
   }
   function transfer(account, sourceId, targetId, emptyProfile) {
@@ -162,7 +174,7 @@
       if (!r.ok) { note(account, r.message || 'Niet verzonden. De lokale voortgang blijft behouden.'); return; }
       try {
         if (r.account !== account) throw new Error('Ongeldig accountantwoord.');
-        if (safe()) finishTransfer(r, sourceId, create ? key : null); else pendingTransfers.push({ result: r, source: sourceId, key: create ? key : null });
+        if (safe()) finishTransfer(r, sourceId, create ? key : null, request); else pendingTransfers.push({ result: r, source: sourceId, key: create ? key : null, sent: request });
         persist(); schedule();
       } catch (e) { note(account, 'Niet toegepast: ' + e.message); }
     });
@@ -184,9 +196,9 @@
     if (!api || busy || !configured() || navigator.onLine === false) return;
     if (safe()) {
       if (pendingLogin) { var login = pendingLogin; pendingLogin = null; acceptAccount(login.result, login.source); return; }
-      if (pendingTransfers.length) { var item = pendingTransfers.shift(); finishTransfer(item.result, item.source, item.key); return; }
+      if (pendingTransfers.length) { var item = pendingTransfers.shift(); finishTransfer(item.result, item.source, item.key, item.sent); return; }
       for (var account in pendingLists) if (pendingLists.hasOwnProperty(account) && meta.sessions[account]) { var list = pendingLists[account]; delete pendingLists[account]; absorb(list, account); }
-      for (var id in pendingRows) if (pendingRows.hasOwnProperty(id) && meta.links[id]) { var row = pendingRows[id]; delete pendingRows[id]; install(row, meta.links[id].account, false); }
+      for (var id in pendingRows) if (pendingRows.hasOwnProperty(id) && meta.links[id]) { var row = pendingRows[id]; delete pendingRows[id]; install(row.result || row, meta.links[id].account, false, row.sent); }
     }
     var selected = api.state().current, link = meta.links[selected];
     for (var pid in meta.links) if (meta.links.hasOwnProperty(pid) && profile(pid) && meta.links[pid].dirty) { selected = pid; link = meta.links[pid]; break; }
@@ -194,18 +206,19 @@
     var session = meta.sessions[link.account], writing = snapshot(profile(selected)) !== link.base;
     if (!writing && !safe()) return;
     if (!writing && Date.now() - (session.checked || 0) > 60000) { refreshAccount(link.account); return; }
+    var sentSnapshot = { player: selected, profile: clone(profile(selected)) };
     var request = { action: writing ? 'write' : 'read', token: session.token, player: selected, revision: link.revision };
-    if (writing) request.profile = clone(profile(selected));
+    if (writing) { request.profile = clone(profile(selected)); request.baseProfile = TBProgress.preferences(JSON.parse(link.base)); }
     busy = true; link.message = writing ? 'Voortgang bewaren…' : 'Voortgang controleren…';
     transport(request, function (r) {
       busy = false; if (meta.sessions[link.account] !== session || meta.links[selected] !== link || !profile(selected)) return;
       try {
         if (!r.ok) { link.message = r.message; note(link.account, r.message); }
-        else if (safe()) { install(r, link.account, false); note(link.account, 'Online bewaard.'); }
+        else if (safe()) { install(r, link.account, false, sentSnapshot); note(link.account, 'Online bewaard.'); }
         else {
           var remote = api.cloudNormalize(r.profile);
           if (snapshot(remote) === snapshot(profile(selected))) { link.base = snapshot(remote); link.dirty = false; link.revision = r.revision; link.message = 'Online bewaard.'; }
-          else pendingRows[selected] = r;
+          else pendingRows[selected] = { result: r, sent: sentSnapshot };
         }
         persist();
       } catch (e) { note(link.account, 'Niet toegepast: ' + e.message); }
