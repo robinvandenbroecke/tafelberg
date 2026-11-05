@@ -81,8 +81,12 @@ async function test(){
  r=await b.rpc({action:'logout',token:alice.token});assert(r.data.ok);
  r=await b.rpc({action:'read',token:alice.token});assert(r.data.authExpired);
  // Nieuwe accounts hebben alleen e-mail en wachtwoord; bestaande namen blijven compatibel.
- r=await b.rpc({action:'register',email:'email-only@example.test',password:'Email-password-123'});assert(r.data.ok);assert.equal(r.data.email,'email-only@example.test');const emailOnly=r.data;
- r=await b.rpc({action:'login',email:' EMAIL-ONLY@EXAMPLE.TEST ',password:'Email-password-123'});assert(r.data.ok);assert.equal(r.data.account,emailOnly.account);
+ r=await b.rpc({action:'register',email:'short@example.test',password:'Seven12'});assert.equal(r.status,400,'Registratie weigert zeven tekens');
+ r=await b.rpc({action:'register',email:'email-only@example.test',password:'Eight-12'});assert(r.data.ok);assert.equal(r.data.email,'email-only@example.test');const emailOnly=r.data;
+ r=await b.rpc({action:'login',email:' EMAIL-ONLY@EXAMPLE.TEST ',password:'Eight-12'});assert(r.data.ok);assert.equal(r.data.account,emailOnly.account);
+ r=await b.rpc({action:'reset',token:emailOnly.token,password:'Seven12'});assert.equal(r.status,400,'Herstel weigert zeven tekens');
+ r=await b.rpc({action:'reset',token:emailOnly.token,password:'Other-12'});assert(r.data.ok,'Herstel accepteert acht tekens');
+ r=await b.rpc({action:'login',email:'email-only@example.test',password:'Other-12'});assert(r.data.ok);
  r=await b.rpc({action:'login',email:'missing@example.test',password:'wrong'});assert.equal(r.data.message,failure);
  r=await b.rpc({action:'recover',email:'email-only@example.test'});assert.equal(r.data.message,recovery);
  r=await b.rpc({action:'login',email:'bad',password:'wrong'});assert.equal(r.status,400);

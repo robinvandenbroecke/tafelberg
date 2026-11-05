@@ -112,8 +112,8 @@ async function main(){
   online=(await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data;
   assert.equal(online.profiles.length,2);assert.equal(online.profiles.find(p=>p.user===hector).profile.stats.stars,80);assert.equal(online.profiles.find(p=>p.user===basil).profile.stats.stars,7);
   // Een nieuw gezinsaccount mag leeg beginnen; een kind heeft geen eigen e-mailadres nodig.
-  const fresh=await device();await local(fresh.p,'Bewaar lokaal',90);await form(fresh.p,'register','fresh','Fresh-password-123',{empty:true});
-  assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-password-123'})).data.profiles.length,0);
+  const fresh=await device();await local(fresh.p,'Bewaar lokaal',90);await form(fresh.p,'register','fresh','Fresh-12',{empty:true});
+  assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-12'})).data.profiles.length,0);
   await fresh.p.getByRole('textbox',{name:'Naam van nieuwe klimmer',exact:true}).fill('Dolores');await fresh.p.getByRole('button',{name:'Nieuwe klimmer maken',exact:true}).click();
   await fresh.p.getByRole('button',{name:'Spelen met Dolores',exact:true}).waitFor();await settled(fresh.p);assert.equal(await fresh.p.evaluate(()=>Tafelberg.profile().stats.stars),0);
   assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name==='Bewaar lokaal').stats.stars),90);
@@ -123,8 +123,8 @@ async function main(){
   await a.p.reload();
   await a.p.getByRole('heading',{name:'Nieuw wachtwoord kiezen',exact:true}).waitFor();
   assert.equal(await a.p.evaluate(()=>location.hash),'','Hersteltokens verdwijnen uit de adresbalk');
-  await a.p.getByLabel('Nieuw wachtwoord',{exact:true}).fill('New-Alice-password-123');
-  await a.p.getByLabel('Herhaal wachtwoord',{exact:true}).fill('New-Alice-password-123');
+  await a.p.getByLabel('Nieuw wachtwoord',{exact:true}).fill('New-1234');
+  await a.p.getByLabel('Herhaal wachtwoord',{exact:true}).fill('New-1234');
   await a.p.getByRole('button',{name:'Wachtwoord opslaan',exact:true}).click();
   await a.p.getByRole('status').filter({hasText:'Wachtwoord gewijzigd'}).waitFor();
   assert.deepEqual(a.p.errors,[]);assert.deepEqual(d.p.errors,[]);

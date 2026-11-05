@@ -262,7 +262,7 @@
       var password = field('Nieuw wachtwoord', 'password', 'new-password'), repeat = field('Herhaal wachtwoord', 'password', 'new-password');
       if (mode === 'reset') { content.appendChild(password.node); content.appendChild(repeat.node); }
       var finishButton = button(mode === 'reset' ? 'Wachtwoord opslaan' : 'Verder met dit account', function () {
-        if (mode === 'reset' && (password.input.value.length < 12 || password.input.value !== repeat.input.value)) { status.textContent = 'Gebruik twee gelijke wachtwoorden van minstens 12 tekens.'; return; }
+        if (mode === 'reset' && (password.input.value.length < 8 || password.input.value !== repeat.input.value)) { status.textContent = 'Gebruik twee gelijke wachtwoorden van minstens 8 tekens.'; return; }
         finishButton.disabled = true; var request = { action: mode, token: linkSession.token };
         if (mode === 'reset') request.password = password.input.value; password.input.value = ''; repeat.input.value = '';
         transport(request, function (r) {
@@ -283,8 +283,8 @@
     content.appendChild(email.node); if (mode !== 'recover') content.appendChild(pass.node);
     var firstSource = null;
     if (mode === 'register') {
-      pass.input.minLength = 12;
-      content.appendChild(h('p', { class: 'set-note' }, 'Wachtwoord: minstens 12 tekens.'));
+      pass.input.minLength = 8;
+      content.appendChild(h('p', { class: 'set-note' }, 'Wachtwoord: minstens 8 tekens.'));
       firstSource = chooser('Voortgang bij account maken', sourceIds(), 'Nog geen lokale voortgang meenemen', current);
       if (sourceIds().length) content.appendChild(firstSource.node);
     }
@@ -293,7 +293,7 @@
       var u = email.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
       if (u.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) { status.textContent = 'Vul een geldig e-mailadres in.'; return; }
       if (mode !== 'recover' && !pass.input.value.length) { status.textContent = 'Vul je wachtwoord in.'; return; }
-      if (mode === 'register' && pass.input.value.length < 12) { status.textContent = 'Gebruik minstens 12 tekens.'; return; }
+      if (mode === 'register' && pass.input.value.length < 8) { status.textContent = 'Gebruik minstens 8 tekens.'; return; }
       var source = mode === 'register' ? firstSource.input.value || null : meta.pending[u] && meta.pending[u].source;
       var request = { action: mode, email: u };
       if (mode !== 'recover') request.password = pass.input.value;
