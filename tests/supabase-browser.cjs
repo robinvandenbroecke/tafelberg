@@ -163,6 +163,29 @@ async function main(){
   await a.p.getByRole('status').filter({hasText:'Wachtwoord gewijzigd'}).waitFor();
   assert.deepEqual(a.p.errors,[]);assert.deepEqual(d.p.errors,[]);
   await a.c.close();await d.c.close();
+  // A legacy duplicated family ID is replaced only after retaining both local copies.
+  const aliasDevice=await device(),aliasAccount='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  await aliasDevice.c.unroute(endpoint);
+  await aliasDevice.c.route(endpoint,async route=>{
+    const body=route.request().postDataJSON(),data=await aliasDevice.p.evaluate(()=>window.aliasFixture);
+    const row={user:'pmergeprimary',profile:data.remote,revision:2};
+    const result=body.action==='list'?{ok:true,account:aliasAccount,profiles:[row],aliases:{pmergesource:'pmergeprimary'}}:{ok:true,account:aliasAccount,...row,...(body.player==='pmergesource'?{redirectedFrom:'pmergesource',aliases:{pmergesource:'pmergeprimary'}}:{})};
+    await route.fulfill({json:result,headers:{'Access-Control-Allow-Origin':'*'}});
+  });
+  await aliasDevice.p.evaluate(account=>{
+    const a=Tafelberg.cloudNewProfile('Hector'),b=Tafelberg.cloudNewProfile('Hector');a.id='pmergeprimary';b.id='pmergesource';a.stats.stars=10;b.stats.stars=15;
+    a.facts['2x3']={b:1,n:1,c:1,rt:2000,last:200,due:300,best:2000};b.facts['3x4']={b:2,n:2,c:2,rt:1500,last:100,due:200,best:1500};
+    Tafelberg.cloudImport(a,false);Tafelberg.cloudImport(b,true);
+    const remote=FamilyProfileMerge.tafelberg(a,b,a.id);window.aliasFixture={remote};
+    localStorage.setItem('alias-test-remote',JSON.stringify(remote));
+    localStorage.setItem('tafelberg.supabase.v2',JSON.stringify({sessions:{[account]:{email:'alias@example.invalid',username:'alias',token:'fixture',expires:Date.now()+3600000,checked:0}},links:{pmergeprimary:{account,revision:1,base:'old',dirty:false},pmergesource:{account,revision:1,base:'old',dirty:false}},pending:{},creates:{},device:'fixture'}));
+  },aliasAccount);
+  await aliasDevice.p.addInitScript(()=>{const raw=localStorage.getItem('alias-test-remote');if(raw)window.aliasFixture={remote:JSON.parse(raw)};});
+  await aliasDevice.p.reload();await aliasDevice.p.evaluate(account=>Tafelberg.go('cloud',{account}),aliasAccount);
+  await aliasDevice.p.waitForFunction(()=>Object.values(Tafelberg.state().profiles).filter(p=>p.name==='Hector').length===1);
+  const migrated=await aliasDevice.p.evaluate(()=>({state:Tafelberg.state(),meta:JSON.parse(localStorage.getItem('tafelberg.supabase.v2'))}));
+  assert(migrated.state.profiles.pmergeprimary.facts['2x3']);assert(migrated.state.profiles.pmergeprimary.facts['3x4']);assert(!migrated.state.profiles.pmergesource);assert(migrated.meta.aliasBackups.pmergesource.length>0);
+  assert.deepEqual(aliasDevice.p.errors,[]);await aliasDevice.c.close();
   console.log('Supabase browser: migratie, meerdere spelers, twee toestellen, verste versie, offline, lopende ronde, tokenverversing, herstel, veilige kopieën en optionele upload naar nieuwe/bestaande accounts geslaagd.');
  }finally{if(browser)await browser.close();await b.db.close();await new Promise(r=>server.close(r));}
 }

@@ -7,7 +7,7 @@
     "check:es5": "node scripts/check-es5.cjs",
     "test:tables": "node tests/table-selection.cjs",
     "test": "npm run test:tables && npm run test:cloud && node tests/web.cjs && node tests/offline.cjs",
-    "test:cloud": "node tests/supabase-db.cjs && node tests/supabase-edge.cjs && node tests/supabase-browser.cjs"
+    "test:cloud": "node tests/family-merge.cjs && node tests/supabase-db.cjs && node tests/supabase-edge.cjs && node tests/supabase-browser.cjs"
   },
   "keywords": [],
   "author": "",

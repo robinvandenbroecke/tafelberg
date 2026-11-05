@@ -71,10 +71,48 @@
     try { persist(); } catch (e) { /* De afzonderlijke spelopslag blijft bestaan. */ }
     schedule();
   }
+  function consolidated(account,id) {
+    var aliases=meta.aliases&&meta.aliases[account]||{};
+    for(var old in aliases)if(Object.prototype.hasOwnProperty.call(aliases,old)&&aliases[old]===id)return true;
+    return false;
+  }
+  function reconcileAliases(result,account) {
+    if(!result.aliases)return;
+    meta.aliases=meta.aliases||{};meta.aliases[account]=result.aliases;
+    var rows=result.profiles||[],was=api.state().current;
+    for(var oldId in result.aliases)if(Object.prototype.hasOwnProperty.call(result.aliases,oldId)) {
+      var target=result.aliases[oldId],row=null;
+      for(var i=0;i<rows.length;i++)if(rows[i].user===target)row=rows[i];
+      if(!row||!row.profile||!meta.links[oldId]||meta.links[oldId].account!==account)continue;
+      var source=profile(oldId),local=profile(target),merged=clone(row.profile);
+      if(source) {
+        meta.aliasBackups=meta.aliasBackups||{};
+        var backups=meta.aliasBackups[oldId]||[];
+        if(!backups.some(function(v){return snapshot(v)===snapshot(source);}))backups.push(clone(source));
+        if(local&&!backups.some(function(v){return snapshot(v)===snapshot(local);}))backups.push(clone(local));
+        meta.aliasBackups[oldId]=backups;persist();
+        if(local)merged=window.FamilyProfileMerge.tafelberg(merged,local,target);
+        merged=window.FamilyProfileMerge.tafelberg(merged,source,target);
+        suppressed=true;
+        try { api.cloudReplaceId(oldId,merged);if(was!==oldId&&was!==target&&profile(was))api.cloudSelect(was); }
+        finally { suppressed=false; }
+      }
+      delete meta.links[oldId];delete pendingRows[oldId];
+      meta.links[target]={account:account,revision:row.revision,base:snapshot(row.profile),dirty:snapshot(merged)!==snapshot(row.profile),message:'Dubbele klimmer samengevoegd.'};
+    }
+    persist();
+  }
   function install(row, account, select) {
+    if(row&&row.redirectedFrom)reconcileAliases({aliases:row.aliases,profiles:[row]},account);
     if (!row || !row.profile || row.user !== row.profile.id || row.account && row.account !== account) throw new Error('Ongeldige klimmer.');
     var remote = api.cloudNormalize(row.profile), local = profile(row.user), old = meta.links[row.user];
     if (old && old.account !== account) throw new Error('Deze klimmer hoort bij een ander account.');
+    if(local&&consolidated(account,row.user)) {
+      var merged=window.FamilyProfileMerge.tafelberg(remote,local,row.user);
+      if(old&&old.dirty&&old.revision===row.revision){merged.settings=clone(local.settings);if(local.stats.mo)merged.stats.mo=clone(local.stats.mo);}
+      suppressed=true;try { api.cloudImport(merged,!!select); }finally { suppressed=false; }
+      meta.links[row.user]={account:account,revision:row.revision,base:snapshot(remote),dirty:snapshot(merged)!==snapshot(remote),message:'Samengevoegde voortgang bewaard.'};persist();return;
+    }
     var keep = local && (TBProgress.compare(local, remote) > 0 || (old && old.dirty && TBProgress.compare(local, remote) === 0));
     suppressed = true;
     try {
@@ -85,6 +123,7 @@
   }
   function absorb(result, account) {
     if (!result || result.account !== account || !Array.isArray(result.profiles) || result.profiles.length > 50) throw new Error('Ongeldige accountgegevens.');
+    reconcileAliases(result,account);
     for (var i = 0; i < result.profiles.length; i++) install(result.profiles[i], account, false);
     if (typeof result.email === 'string') meta.sessions[account].email = result.email;
     meta.sessions[account].checked = Date.now(); persist();
@@ -133,6 +172,7 @@
     if (sourceId && meta.links[sourceId]) throw new Error('Deze lokale klimmer is al gekoppeld.');
     if (local && TBProgress.compare(local, chosen) > 0) chosen = local;
     if (source && TBProgress.compare(source, chosen) >= 0) { chosen = clone(source); chosen.id = result.user; useSource = true; }
+    if (source && result.reused) { chosen = window.FamilyProfileMerge.tafelberg(remote, source, result.user); if(local)chosen=window.FamilyProfileMerge.tafelberg(chosen,local,result.user); useSource=true; }
     suppressed = true;
     try {
       // Eerst bevestigd door de server en duurzaam lokaal bewaren, dan pas de losse bron vervangen.
