@@ -53,6 +53,40 @@ async function main(){
    await p.getByRole('combobox',{name:'Opslaan als',exact:true}).selectOption(target);
    await p.getByRole('button',{name:'Voortgang toevoegen',exact:true}).click();await settled(p);
   }
+  // Echte tikken op een telefoon; het scherm wordt kleiner bij een open toetsenbord.
+  const mobile=await device();await mobile.p.setViewportSize({width:412,height:915});
+  await local(mobile.p,'OnePlus klimmer',3);
+  await mobile.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).tap();
+  await mobile.p.getByRole('button',{name:/^(Nieuw account maken|Account maken)$/}).tap();
+  await mobile.p.getByRole('heading',{name:'Account maken',exact:true}).waitFor();
+  await mobile.p.setViewportSize({width:412,height:400});
+  await mobile.p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill('oneplus@example.test');
+  await mobile.p.getByLabel('Wachtwoord',{exact:true}).fill('short');
+  await mobile.p.getByRole('button',{name:'Account maken',exact:true}).tap();
+  const message=mobile.p.getByRole('status');assert.match(await message.textContent(),/minstens/);
+  assert(await message.evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),'Een foutmelding moet zichtbaar zijn na een tik');
+  // Een geblokkeerde native verbinding moet direct feedback geven en de knop vrijgeven.
+  await mobile.p.addInitScript(()=>{window.AndroidSync={request(){throw Error('bridge unavailable');}};});
+  await mobile.p.reload();
+  await mobile.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).tap();
+  await mobile.p.getByRole('button',{name:/^(Nieuw account maken|Account maken)$/}).tap();
+  await mobile.p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill('oneplus@example.test');
+  await mobile.p.getByLabel('Wachtwoord',{exact:true}).fill('Oneplus-password-123');
+  await mobile.p.getByRole('button',{name:'Account maken',exact:true}).tap();
+  await mobile.p.getByRole('status').filter({hasText:'Verbinding starten lukt niet'}).waitFor({timeout:2000});
+  assert(await mobile.p.getByRole('button',{name:'Account maken',exact:true}).isEnabled());
+  assert.deepEqual(mobile.p.errors,[]);await mobile.c.close();
+  // Een geslaagde registratie blijft zichtbaar als het toestel geen extra opslag toelaat.
+  const full=await device();await full.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).tap();
+  await full.p.getByRole('button',{name:/^(Nieuw account maken|Account maken)$/}).tap();
+  await full.p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill('full@example.test');
+  await full.p.getByLabel('Wachtwoord',{exact:true}).fill('Full-password-123');
+  await full.p.evaluate(()=>{const save=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='tafelberg.supabase.v2')throw new DOMException('Full','QuotaExceededError');return save.call(this,key,value);};});
+  b.settings.confirmation=true;
+  await full.p.getByRole('button',{name:'Account maken',exact:true}).tap();
+  await full.p.getByRole('status').filter({hasText:'Bevestig je account'}).waitFor({timeout:5000});
+  await full.p.getByRole('status').filter({hasText:'uploadkeuze kon niet worden onthouden'}).waitFor();
+  assert.deepEqual(full.p.errors,[]);b.settings.confirmation=false;await full.c.close();
   const a=await device();
   await a.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).click();
   await a.p.getByRole('heading',{name:'Aanmelden',exact:true}).waitFor();
