@@ -60,7 +60,7 @@ export function createHandler(config, fetcher = fetch) {
         if ((!byEmail || action === 'register' && username) && (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(username) || ['constructor','prototype'].includes(username))) return reply({ ok: false, message: 'Gebruik 3 tot 30 letters, cijfers, - of _.' }, 400);
         if (!await limit(action + ':ip:' + ip, action === 'login' ? 30 : 5, action === 'login' ? 900 : 3600)
           || !await limit(action + ':identity:' + (byEmail ? suppliedEmail : username), action === 'login' ? 10 : 3, 900)) return reply({ ok: false, message: 'Te vaak geprobeerd. Probeer later opnieuw.' }, 429);
-        if (action !== 'recover' && (typeof input.password !== 'string' || input.password.length < (action === 'register' ? 12 : 1) || input.password.length > 128)) return reply({ ok: false, message: 'Gebruik een wachtwoord van 12 tot 128 tekens.' }, 400);
+        if (action !== 'recover' && (typeof input.password !== 'string' || input.password.length < (action === 'register' ? 8 : 1) || input.password.length > 128)) return reply({ ok: false, message: 'Gebruik een wachtwoord van 8 tot 128 tekens.' }, 400);
         if (action === 'register') {
           const email = suppliedEmail;
           if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply({ ok: false, message: 'Vul een geldig e-mailadres in.' }, 400);
@@ -93,7 +93,7 @@ export function createHandler(config, fetcher = fetch) {
       if (!verified.ok || !verified.data.id) return reply({ ok: false, authExpired: true, message: 'Meld je opnieuw aan.' }, 401);
       if (action === 'logout') { await call('/auth/v1/logout?scope=local', {}, input.token); return reply({ ok: true }); }
       if (action === 'reset') {
-        if (typeof input.password !== 'string' || input.password.length < 12 || input.password.length > 128) return reply({ ok: false, message: 'Gebruik 12 tot 128 tekens.' }, 400);
+        if (typeof input.password !== 'string' || input.password.length < 8 || input.password.length > 128) return reply({ ok: false, message: 'Gebruik 8 tot 128 tekens.' }, 400);
         const r = await call('/auth/v1/user', { password: input.password }, input.token, false, 'PUT');
         return reply(r.ok ? { ok: true, message: 'Wachtwoord gewijzigd. Meld je opnieuw aan in Tafelberg.' } : { ok: false, message: 'Herstellen lukt niet. Vraag een nieuwe herstelmail aan.' });
       }

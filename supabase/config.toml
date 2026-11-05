@@ -3,3 +3,6 @@ project_id = "tafelberg"
 [functions.tafelberg]
 # Aanmelden is publiek; de functie controleert sessies zelf vóór gegevensverkeer.
 verify_jwt = false
+
+[auth]
+minimum_password_length = 8
