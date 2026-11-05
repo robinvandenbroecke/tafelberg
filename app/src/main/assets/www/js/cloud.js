@@ -37,7 +37,11 @@
     if (navigator.onLine === false) { callback({ ok: false, message: 'Geen internet. Je voortgang blijft op dit toestel.' }); return; }
     var id = 'r' + (++sequence);
     pending[id] = { callback: callback, timeout: window.setTimeout(function () { finish(id, { ok: false, message: 'Geen bevestiging ontvangen. Je voortgang blijft op dit toestel.' }); }, 30000) };
-    if (native && typeof native.request === 'function') { native.request(window.TB_CLOUD_URL, id, JSON.stringify(request)); return; }
+    if (native && typeof native.request === 'function') {
+      try { native.request(window.TB_CLOUD_URL, id, JSON.stringify(request)); }
+      catch (e) { finish(id, { ok: false, message: 'Verbinding starten lukt niet. Probeer opnieuw of open de webapp.' }); }
+      return;
+    }
     if (window.AndroidStore) { finish(id, { ok: false, message: 'Installeer de nieuwe APK om online te bewaren, of gebruik de webapp.' }); return; }
     var xhr = new XMLHttpRequest(); xhr.open('POST', window.TB_CLOUD_URL, true); xhr.timeout = 25000;
     xhr.setRequestHeader('Content-Type', 'application/json');
@@ -110,7 +114,7 @@
     return out;
   }
   function label(p) { var rank = TBProgress.rank(p); return p.name + ': ' + rank[0] + ' sterren, ' + rank[1] + ' rondes'; }
-  function button(text, fn) { return h('button', { class: 'btn btn-line', onclick: fn }, text); }
+  function button(text, fn) { return h('button', { class: 'btn btn-line', type: 'button', onclick: fn }, text); }
   function field(text, type, autocomplete) {
     var input = h('input', { class: 'name-input', type: type || 'text', 'aria-label': text, autocomplete: autocomplete || 'off', maxlength: type === 'password' ? '128' : type === 'email' ? '254' : '30' });
     if (type !== 'password') input.setAttribute('autocapitalize', 'none');
@@ -214,7 +218,15 @@
     if (!account) for (var accountKey in meta.sessions) if (meta.sessions.hasOwnProperty(accountKey)) { account = accountKey; break; }
     s = account && meta.sessions[account];
     var mode = params.mode || (s ? 'account' : 'login');
-    var content = h('div', { class: 'cloud-card' }), status = h('p', { class: 'set-note', role: 'status' });
+    var content = h('div', { class: 'cloud-card' }), status = h('p', { class: 'set-note cloud-status', role: 'status', tabindex: '-1' });
+    function report(message) {
+      status.textContent = message;
+      // Geef ook bij een open telefoontoetsenbord onmiddellijk zichtbare feedback.
+      if (ui && ui.note === status && status.parentNode) {
+        status.focus();
+        status.scrollIntoView(false);
+      }
+    }
     ui = { account: account, mode: mode, note: status };
     root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'home' : 'newPlayer'); }), h('h1', null, 'Mijn account')]), h('div', { class: 'cloud-main' }, content)]));
     if (!configured()) { content.appendChild(h('p', null, 'Online bewaren is nog niet beschikbaar. Je voortgang blijft op dit toestel.')); return; }
@@ -291,26 +303,33 @@
     var submit = button(mode === 'register' ? 'Account maken' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden', function () {
       if (submit.disabled) return;
       var u = email.input.value.toLowerCase().replace(/^\s+|\s+$/g, '');
-      if (u.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) { status.textContent = 'Vul een geldig e-mailadres in.'; return; }
-      if (mode !== 'recover' && !pass.input.value.length) { status.textContent = 'Vul je wachtwoord in.'; return; }
-      if (mode === 'register' && pass.input.value.length < 12) { status.textContent = 'Gebruik minstens 12 tekens.'; return; }
+      if (u.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) { report('Vul een geldig e-mailadres in.'); return; }
+      if (mode !== 'recover' && !pass.input.value.length) { report('Vul je wachtwoord in.'); return; }
+      if (mode === 'register' && pass.input.value.length < 12) { report('Gebruik minstens 12 tekens.'); return; }
       var source = mode === 'register' ? firstSource.input.value || null : meta.pending[u] && meta.pending[u].source;
       var request = { action: mode, email: u };
       if (mode !== 'recover') request.password = pass.input.value;
-      pass.input.value = ''; submit.disabled = true; status.textContent = 'Even verbinden…';
+      pass.input.blur(); email.input.blur();
+      pass.input.value = ''; submit.disabled = true; submit.textContent = 'Even verbinden…'; report('Even verbinden…');
       transport(request, function (r) {
-        submit.disabled = false; if (!r.ok) { status.textContent = r.message || 'Aanmelden lukt nu niet.'; return; }
-        if (mode === 'recover') { status.textContent = r.message; return; }
-        if (r.confirmation) { meta.pending[u] = { source: source }; meta.lastEmail = u; persist(); status.textContent = r.message; content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return; }
-        try { acceptAccount(r, source); } catch (e) { status.textContent = 'Niet toegepast: ' + e.message; }
+        submit.disabled = false; submit.textContent = mode === 'register' ? 'Account maken' : mode === 'recover' ? 'Herstelmail versturen' : 'Aanmelden';
+        if (!r.ok) { report(r.message || 'Aanmelden lukt nu niet.'); return; }
+        if (mode === 'recover') { report(r.message); return; }
+        if (r.confirmation) {
+          meta.pending[u] = { source: source }; meta.lastEmail = u;
+          try { persist(); report(r.message); }
+          catch (e) { report(r.message + ' De uploadkeuze kon niet worden onthouden. Je kunt je lokale voortgang na aanmelden toevoegen.'); }
+          content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return;
+        }
+        try { acceptAccount(r, source); } catch (e) { report('Niet toegepast: ' + e.message); }
       });
     });
     function enter(e) { if ((e.keyCode || e.which) === 13) { e.preventDefault(); submit.click(); } }
     email.input.addEventListener('keydown', enter, false); pass.input.addEventListener('keydown', enter, false);
     submit.className = 'btn btn-sun';
-    content.appendChild(submit); content.appendChild(status);
+    content.appendChild(status); content.appendChild(submit);
     if (mode !== 'login') content.appendChild(button('Ik heb al een account', function () { api.go('cloud', { mode: 'login' }); }));
-    if (mode === 'login') { content.appendChild(button('Account maken', function () { api.go('cloud', { mode: 'register' }); })); content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); })); }
+    if (mode === 'login') { content.appendChild(button('Nieuw account maken', function () { api.go('cloud', { mode: 'register' }); })); content.appendChild(button('Wachtwoord vergeten', function () { api.go('cloud', { mode: 'recover' }); })); }
 
   }
   window.TBCloud = {
