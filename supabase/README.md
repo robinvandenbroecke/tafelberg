@@ -18,6 +18,8 @@ Wachtwoord vergeten is beschikbaar via een herstelmail. Accountbeheer verloopt v
 
 ## Beheerd project activeren
 
+Het Supabase-beheeraccount van dit project meldt aan via **Continue with GitHub**. Dit beheeraccount staat los van de e-mailaccounts van spelers in Tafelberg.
+
 1. Maak een **gratis** Supabase-project voor Tafelberg aan, bij voorkeur Frankfurt (`eu-central-1`). Controleer de prijs vóór aanmaken. Gebruik dit project uitsluitend voor Tafelberg; de Auth-trigger maakt voor iedere nieuwe gebruiker een interne accountsleutel.
 2. Controleer eerst bestaande tabellen. Pas daarna de SQL onder `migrations/` toe. De gebruikersnamen en limieten staan in `tafelberg_private`, buiten de Data API. Laat uitsluitend `public` in de Data API staan. Voortgang heeft RLS en alleen leesrechten voor de eigenaar; schrijven gaat via de gecontroleerde `tb_sync`-transactie.
 3. Stel Auth Site URL en toegestane redirect exact in op `https://robinvandenbroecke.github.io/tafelberg/`. Laat e-mailbevestiging aan; minimum wachtwoordlengte 8. Schakel anonieme accounts en ongebruikte providers uit. Behoud de standaardbeveiligingen en sessieverversing. Auth-rollen worden nooit uit gebruikersmetadata afgeleid.
