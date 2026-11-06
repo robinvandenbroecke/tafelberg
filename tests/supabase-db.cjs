@@ -100,6 +100,19 @@ async function test(){
  await db.query("insert into public.tafelberg_progress(owner_id,profile_id,profile) values($1,'plegacy',$2::jsonb)",[D,JSON.stringify({...profile(150),id:'plegacy',name:'Hector'})]);
  const migrated=await list(D);assert.equal(migrated.profiles.length,1);assert.equal(migrated.profiles[0].profile.stats.stars,150);
  assert((await db.query('select count(*)::int as n from public.tafelberg_progress where owner_id=$1 and merged_into is not null',[D])).rows[0].n>=3);
+ // Kennis en kleding zijn blijvende mijlpalen, onafhankelijk van sterren.
+ const E='55555555-5555-4555-8555-555555555555';await db.query("insert into auth.users values($1,'rewards@example.test','{}')",[E]);
+ const rewardBase={...profile(10),name:'Beloningen',stats:{stars:10,masteredBest:0,wardrobe:{},badges:{},rewardsVersion:1}};
+ const rewardFirst=await create(E,rewardBase);
+ await playerSync(E,{...rewardBase,stats:{...rewardBase.stats,stars:50}},1,rewardFirst.user);
+ const offlineReward={...rewardBase,stats:{stars:20,masteredBest:100,wardrobe:{kroon:true},badges:{summit10:'2026-11-06'},rewardsVersion:1}};
+ const earned=await playerSync(E,offlineReward,1,rewardFirst.user,false,null,rewardBase);
+ assert.equal(earned.profile.stats.stars,50);assert.equal(earned.profile.stats.masteredBest,100);assert.equal(earned.profile.stats.wardrobe.kroon,true);assert(earned.profile.stats.badges.summit10);
+ const legacyUpload=await playerSync(E,{...profile(60),name:'Beloningen'},1,rewardFirst.user);
+ assert.equal(legacyUpload.profile.stats.masteredBest,100,'Ook een oudere APK kan een behaalde mijlpaal niet overschrijven');
+ const rewardDuplicate=await create(E,{...rewardBase,stats:{...rewardBase.stats,stars:70}});
+ assert.equal(rewardDuplicate.profile.stats.masteredBest,100);assert.equal(rewardDuplicate.profile.stats.wardrobe.kroon,true);
+ await assert.rejects(as(E,"select tafelberg_private.merge_rewards('{}','{}')"),'Geen nieuwe directe schrijfrechten voor clients');
  console.log('Supabase Postgres: gebruikersscheiding, RLS, rolrechten, verste versie, revisies, herhalingen, validatie en limieten geslaagd.');
  }finally{await db.close();}
 }

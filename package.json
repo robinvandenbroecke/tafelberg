@@ -6,7 +6,7 @@
     "build:web": "node scripts/build-web.cjs",
     "check:es5": "node scripts/check-es5.cjs",
     "test:tables": "node tests/table-selection.cjs",
-    "test": "npm run test:tables && npm run test:cloud && node tests/web.cjs && node tests/offline.cjs",
+    "test": "node tests/rewards.cjs && npm run test:tables && npm run test:cloud && node tests/web.cjs && node tests/offline.cjs",
     "test:cloud": "node tests/supabase-db.cjs && node tests/supabase-edge.cjs && node tests/supabase-browser.cjs"
   },
   "keywords": [],

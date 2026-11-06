@@ -26,7 +26,7 @@
   var STORE_KEY = 'tafelberg.v1';
   var HOUR = 3600000;
   var DAY = 24 * HOUR;
-  var MASTER = 4;
+  var MASTER = TBRewards.master;
   var ANCHORS = [1, 2, 5, 10];
   var INTRO_ORDER = [1, 2, 10, 5, 3, 4, 6, 9, 8, 7];
   var PEAK_H = { 1: 0.5, 2: 0.6, 3: 0.76, 4: 0.72, 5: 0.66, 6: 0.84, 7: 0.96, 8: 0.9, 9: 0.8, 10: 0.62 };
@@ -37,12 +37,7 @@
   var SPRINT_MS = 60000;
   var SPRINT_MIN = 6;
 
-  // Klimniveaus: hoeveel sterren je nodig hebt voor elke titel.
-  var LEVELS = [
-    [0, 'Wandelaar'], [15, 'Padzoeker'], [40, 'Rotsklimmer'], [80, 'Touwklimmer'], [140, 'Gletsjerloper'],
-    [220, 'Berggids'], [320, 'Toppenjager'], [450, 'Bergkampioen'], [620, 'Sneeuwarend'], [850, 'Tafelkoning']
-  ];
-
+  // Klimniveaus en kleding volgen dezelfde beheersingsmijlpalen.
   // Medailles. Elke test krijgt de statistieken van de speler.
   var BADGES = [
     { id: 'step', icon: 'mountain', title: 'Eerste stap', text: 'Je eerste oefenronde.', test: function (st) { return st.rounds >= 1; } },
@@ -53,7 +48,7 @@
     { id: 'ladder', icon: 'stairs', title: 'Trappenloper', text: 'Een tafelrij naar boven en terug naar beneden.', test: function (st) { return ladderBoth(st) >= 1; } },
     { id: 'summit1', icon: 'flag', title: 'Eerste top', text: 'Alle sommen van één tafel zitten erin.', test: function () { return summitsCount() >= 1; } },
     { id: 'summit5', icon: 'flag', title: 'Vijf toppen', text: 'Vijf tafels helemaal onder de knie.', test: function () { return summitsCount() >= 5; } },
-    { id: 'summit10', icon: 'crown', title: 'Alle toppen', text: 'Alle tien tafels zitten erin.', test: function () { return summitsCount() >= 10; } },
+    { id: 'summit10', icon: 'crown', title: 'Alle toppen', text: 'Alle tien tafels zitten erin.', test: function (st) { return st.masteredBest >= 100 || summitsCount() >= 10; } },
     { id: 'days3', icon: 'sun', title: 'Drie dagen', text: 'Drie dagen na elkaar geoefend.', test: function (st) { return st.bestStreak >= 3; } },
     { id: 'days7', icon: 'sun', title: 'Een hele week', text: 'Zeven dagen na elkaar geoefend.', test: function (st) { return st.bestStreak >= 7; } },
     { id: 'sprint10', icon: 'hut', title: 'Snelle voeten', text: '10 sommen in één sprint.', test: function (st) { return st.sprintBest >= 10; } },
@@ -84,7 +79,7 @@
       sprints: 0, sprintBest: 0, ladderUp: {}, ladderDown: {}, badges: {},
       lm: defaultLm(), hist: [],
       huts: 1, hutDays: [], played: [], today: null, goals: 0, chests: 0,
-      records: 0, bestBoltRun: 0, races: 0, race: {}, gold: {}, mo: {}
+      records: 0, bestBoltRun: 0, races: 0, race: {}, gold: {}, mo: {}, masteredBest: 0, wardrobe: {}, rewardsVersion: 1
     };
   }
 
@@ -140,7 +135,9 @@
         return typeof t === 'number' && t >= 1 && t <= 10 && t % 1 === 0 && list.indexOf(t) === index && p.settings.tables.indexOf(t) < 0;
       });
       p.facts = p.facts || {};
+      var legacyRewards = !p.stats || p.stats.rewardsVersion === undefined;
       p.stats = fill(p.stats || {}, defaultStats());
+      TBRewards.init(p, legacyRewards);
       keep.push(p.id);
     }
     st.order = keep;
@@ -433,25 +430,16 @@
   }
 
   // ---------------------------------------------------------------- klimniveaus
-  function levelInfo(stars) {
-    var i = 0;
-    while (i + 1 < LEVELS.length && stars >= LEVELS[i + 1][0]) i++;
-    var from = LEVELS[i][0], last = i + 1 >= LEVELS.length;
-    var to = last ? from : LEVELS[i + 1][0];
-    return {
-      n: i + 1, title: LEVELS[i][1], next: last ? null : LEVELS[i + 1][1],
-      need: last ? 0 : to - stars, frac: last ? 1 : (stars - from) / (to - from)
-    };
-  }
+  function levelInfo(pr) { return TBRewards.info(pr || P()); }
 
-  function levelCard(stars, extra) {
-    var L = levelInfo(stars);
+  function levelCard(pr, extra) {
+    var L = levelInfo(pr);
     return h('div', { class: 'lvl' + (extra ? ' ' + extra : '') }, [
       h('span', { class: 'lvl-n', 'aria-label': 'niveau ' + L.n }, String(L.n)),
       h('div', { class: 'lvl-body' }, [
         h('span', { class: 'lvl-title' }, L.title),
         h('div', { class: 'lvl-bar' }, h('div', { class: 'lvl-fill', style: 'width:' + Math.round(L.frac * 100) + '%' })),
-        h('span', { class: 'lvl-need' }, L.next ? 'Nog ' + L.need + (L.need === 1 ? ' ster' : ' sterren') + ' tot ' + L.next : 'Het hoogste niveau!')
+        h('span', { class: 'lvl-need' }, L.next ? 'Nog ' + L.need + (L.need === 1 ? ' som vlot kennen' : ' sommen vlot kennen') + ' tot ' + L.next : 'Alle tien tafels behaald!')
       ])
     ]);
   }
@@ -474,6 +462,7 @@
 
   // Kent nieuwe medailles toe en geeft ze terug.
   function awardBadges() {
+    rewardMastery(P());
     var st = P().stats, got = [];
     for (var i = 0; i < BADGES.length; i++) {
       var b = BADGES[i];
@@ -547,24 +536,14 @@
   // ---------------------------------------------------------------- Mo de marmot
   // De gids van Tafelberg. Stemmingen: blij, juich, denk, wauw, troost, zwaai.
   // Kleren komen vrij per klimniveau en zitten elk op een eigen plek (slot).
-  var MO_ITEMS = [
-    { id: 'muts', slot: 'head', level: 2, name: 'een muts' },
-    { id: 'sjaal', slot: 'neck', level: 3, name: 'een sjaal' },
-    { id: 'rugzak', slot: 'back', level: 4, name: 'een rugzak' },
-    { id: 'bril', slot: 'eyes', level: 5, name: 'een skibril' },
-    { id: 'helm', slot: 'head', level: 6, name: 'een klimhelm' },
-    { id: 'vlag', slot: 'hand', level: 7, name: 'een vlag' },
-    { id: 'medaille', slot: 'neck', level: 8, name: 'een medaille' },
-    { id: 'ijsbijl', slot: 'hand', level: 9, name: 'een ijsbijl' },
-    { id: 'kroon', slot: 'head', level: 10, name: 'een kroon' }
-  ];
+  var MO_ITEMS = TBRewards.items;
 
   function moItem(id) {
     for (var i = 0; i < MO_ITEMS.length; i++) if (MO_ITEMS[i].id === id) return MO_ITEMS[i];
     return null;
   }
 
-  function moWear(pr) { return (pr || P()).stats.mo || {}; }
+  function moWear(pr) { return TBRewards.wear(pr || P()); }
 
   function ell(cx, cy, rx, ry, cls, rot) {
     var a = { cx: cx, cy: cy, rx: rx, ry: ry, class: cls };
@@ -1212,7 +1191,7 @@
     lastHomeLine = line.text;
     var hello = h('div', { class: 'hello' }, [
       h('h1', null, 'Dag ' + pr.name + '!'),
-      h('div', { class: 'hello-cards' }, [levelCard(stats.stars, 'home-lvl'), goalCard(pr)])
+      h('div', { class: 'hello-cards' }, [levelCard(pr, 'home-lvl'), goalCard(pr)])
     ]);
     var rangeEl = h('div', { class: 'range' }, [sun, hello, say, peaks]);
 
@@ -1289,7 +1268,7 @@
     var cards = h('div', { class: 'who-cards' });
     for (var i = 0; i < S.order.length; i++) {
       (function (id) {
-        var pr = S.profiles[id], L = levelInfo(pr.stats.stars);
+        var pr = S.profiles[id], L = levelInfo(pr);
         cards.appendChild(h('button', {
           class: 'who-card' + (id === S.current ? ' cur' : ''), 'aria-label': pr.name,
           onclick: function () { S.current = id; saveState(); go('home'); }
@@ -1638,7 +1617,7 @@
       i: 0, main: 0, queue: [], hist: [], count: {}, newBudget: pc.newStart, newMax: pc.newMax, newCount: 0,
       errRun: 0, calm: false, fastRun: 0,
       stars: 0, firstOk: 0, fast: 0, wrong: [], wrongSeen: {}, mastered: [], doneBefore: before,
-      answered: 0, combo: 0, bestCombo: 0, bonus: 0, starsBefore: P().stats.stars, perfect: false, newBadges: [],
+      answered: 0, combo: 0, bestCombo: 0, bonus: 0, starsBefore: P().stats.stars, levelBefore: levelInfo(P()).n, perfect: false, newBadges: [],
       thinks: [], slow: [], slowSeen: {}, unlocked: null,
       boltRun: 0, bestBoltRun: 0, boltStars: 0, records: [], moSaid: {}
     };
@@ -1792,6 +1771,7 @@
     // Een paar uur speling, zodat een som die 'morgen' terugkomt ook bij een vroegere ronde klaarstaat.
     f.due = pc.days[f.b] ? now + pc.days[f.b] * DAY - 4 * HOUR : now;
     f.last = now;
+    rewardMastery(P());
     return { fast: fast, bolt: bolt, before: before, after: f.b, isNew: isNew, think: think, record: record, prevBest: prevBest };
   }
 
@@ -2184,7 +2164,7 @@
       var t = se.tables[i];
       if (!se.doneBefore[t] && tableDone(t)) summits.push(t);
     }
-    var L0 = levelInfo(se.starsBefore), L1 = levelInfo(pr.stats.stars), up = L1.n > L0.n;
+    var L1 = levelInfo(pr), up = L1.n > (se.levelBefore || L1.n);
     SND.done();
 
     var title = summits.length ? 'Op de top van de tafel van ' + listNl(summits) + '!' : (se.perfect ? 'Foutloos!' : 'Klaar!');
@@ -2244,7 +2224,7 @@
         stats,
         h('div', { class: 'sum-lvl-wrap' }, [
           se.unlocked ? h('p', { class: 'sum-levelup unlock' }, [icon('mountain'), 'Nieuwe berg open: de tafel van ' + se.unlocked + '!']) : null,
-          levelCard(pr.stats.stars, 'sum-lvl')
+          levelCard(pr, 'sum-lvl')
         ]),
         h('div', { class: 'sum-blocks' }, blocks)
       ]),
@@ -2499,20 +2479,16 @@
     pending.push({ type: type, data: data || {} });
   }
 
-  // Sterren bijtellen. Hier zitten ook het dagdoel en de nieuwe kleren voor Mo.
+  function rewardMastery(pr) {
+    var gained = TBRewards.update(pr);
+    for (var i = 0; i < gained.length; i++) { var it = gained[i]; pr.stats.mo[it.slot] = it.id; queue('item', { id: it.id }); }
+  }
+
+  // Sterren belonen oefenen en het dagdoel. Ze bepalen geen klimniveau of kroon.
   function addStars(n) {
-    var pr = P(), t = today(), before = levelInfo(pr.stats.stars).n;
-    pr.stats.stars += n;
-    t.stars += n;
+    var pr = P(), t = today();
+    pr.stats.stars += n; t.stars += n;
     if (!t.hit && t.stars >= goalStars(pr)) { t.hit = true; pr.stats.goals++; queue('goal'); }
-    var after = levelInfo(pr.stats.stars).n;
-    for (var i = 0; i < MO_ITEMS.length; i++) {
-      var it = MO_ITEMS[i];
-      if (it.level > before && it.level <= after) {
-        pr.stats.mo[it.slot] = it.id;
-        queue('item', { id: it.id });
-      }
-    }
   }
 
   // Dagen op rij. Mis je één dag en heb je een schuilhut, dan blijft de reeks staan.
@@ -2671,7 +2647,7 @@
     } else if (item.type === 'item') {
       var it = moItem(item.data.id);
       body.push(h('h1', null, 'Nieuw voor Mo!'));
-      body.push(h('p', { class: 'cel-sub' }, 'Je bent nu ' + levelInfo(st.stars).title + '. Mo krijgt ' + it.name + '.'));
+      body.push(h('p', { class: 'cel-sub' }, 'Je bent nu ' + levelInfo(P()).title + '. Mo krijgt ' + it.name + '.'));
       mo = moSay('Kijk, ' + it.name + '! Die doe ik meteen aan.', 'juich', { cls: 'cel-mo big' });
       body.push(h('button', { class: 'btn btn-line', onclick: function () { go('kast', { back: 'home' }); } }, 'Naar de kast van Mo'));
     } else if (item.type === 'gold') {
@@ -2702,7 +2678,7 @@
   // ---------- de kast van Mo
   screens.kast = function (p) {
     current.back = function () { go('home'); };
-    var pr = P(), wear = pr.stats.mo, L = levelInfo(pr.stats.stars).n;
+    var pr = P(), wear = moWear(pr), L = levelInfo(pr).n;
     var stage = h('div', { class: 'kast-mo' });
     var grid = h('div', { class: 'kast-grid' });
 
@@ -2712,19 +2688,19 @@
       grid.innerHTML = '';
       for (var i = 0; i < MO_ITEMS.length; i++) {
         (function (it) {
-          var owned = L >= it.level, on = wear[it.slot] === it.id;
+          var owned = TBRewards.owns(pr, it), on = wear[it.slot] === it.id;
           var demo = {}; demo[it.slot] = it.id;
           grid.appendChild(h('button', {
             class: 'kast-item' + (owned ? '' : ' locked') + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false',
             onclick: function () {
-              if (!owned) { speak('Dat krijg je op niveau ' + it.level + '.'); return; }
-              wear[it.slot] = on ? null : it.id;
+              if (!owned) { speak(it.id === 'kroon' ? 'De kroon krijg je als alle tien tafels erin zitten.' : 'Dat krijg je op niveau ' + it.level + '.'); return; }
+              pr.stats.mo[it.slot] = on ? null : it.id; wear = moWear(pr);
               saveState(); drawStage(); drawGrid();
             }
           }, [
             moSvg('blij', demo, 'kast-mini'),
             h('span', { class: 'ki-name' }, it.name.replace(/^een /, '')),
-            h('span', { class: 'ki-state' }, owned ? (on ? 'Aan' : 'Uit') : 'Niveau ' + it.level)
+            h('span', { class: 'ki-state' }, owned ? (on ? 'Aan' : 'Uit') : (it.id === 'kroon' ? 'Alle tien tafels' : 'Niveau ' + it.level))
           ]));
         })(MO_ITEMS[i]);
       }
@@ -3148,6 +3124,9 @@
       if (p.settings.pace !== undefined && ['auto','rustig','gewoon','snel'].indexOf(p.settings.pace) < 0) throw new Error('Ongeldig leertempo.');
       if (p.settings.goal !== undefined && ['klein','gewoon','groot'].indexOf(p.settings.goal) < 0) throw new Error('Ongeldig dagdoel.');
       var stt = p.stats;
+      if (stt.masteredBest !== undefined && (stt.masteredBest > 100 || stt.masteredBest % 1)) throw new Error('Ongeldige beheersingsmijlpaal.');
+      if (stt.rewardsVersion !== undefined && stt.rewardsVersion !== 1) throw new Error('Ongeldige beloningsversie.');
+      if (stt.wardrobe) for (var wi in stt.wardrobe) if (stt.wardrobe.hasOwnProperty(wi) && (!moItem(wi) || typeof stt.wardrobe[wi] !== 'boolean')) throw new Error('Ongeldige kledingbeloning.');
       if (stt.hist) for (var hi = 0; hi < stt.hist.length; hi++) { check(stt.hist[hi], { d: '', acc: 0, think: 0, pace: 0 }); }
       var lists = ['played', 'hutDays'];
       for (var li = 0; li < lists.length; li++) if (stt[lists[li]]) for (var di = 0; di < stt[lists[li]].length; di++) {
@@ -3385,7 +3364,7 @@
           h('p', null, 'Op tempo werken komt pas als een som begrepen is. De bliksembalk verschijnt alleen bij sommen die al gekend zijn, en bij nieuwe sommen telt eerst het inzicht. Sterren komen er voor elk juist antwoord, met een extra ster per reeks van vijf. Zo telt nauwkeurig werken meer dan haast.'),
           h('p', null, 'Snelheid wordt apart beloond, altijd tegenover het eigen kunnen. Een antwoord binnen drie seconden levert een extra ster op, en tijdens een bliksemreeks (drie of meer na elkaar) twee. Wie een som sneller beantwoordt dan ooit tevoren, krijgt een record en een ster. Zit een hele tafel erin én gaat ze gemiddeld binnen 2,2 seconden, dan wappert er een gouden vlag op die berg.'),
           h('p', null, 'Onder Snelheid staan de sprint en een race per tafel. De sprint duurt één minuut, met alleen sommen die al goed gaan. Een race gaat over de tien sommen van één tafel, met brons onder 70, zilver onder 45 en goud onder 30 seconden (op e-ink een vijfde ruimer). Een race opent pas als minstens zes sommen van die tafel vlot gaan. In beide loopt een schaduwklimmer mee in het tempo van het eigen record. Een fout tijdens een race of sprint stuurt die som terug naar het gewone oefenen.'),
-          h('p', null, 'Mo de marmot moedigt aan in korte zinnen en kan ze voorlezen. Er is een dagdoel in sterren met een schatkist als het gehaald is, en een reeks van dagen op rij. Mist uw kind één dag, dan bewaart een schuilhut de reeks. Elke zeven dagen op rij levert er een op, met een maximum van twee. Bij elk nieuw klimniveau krijgt Mo iets nieuws om aan te trekken.'),
+          h('p', null, 'Mo de marmot moedigt aan in korte zinnen en kan ze voorlezen. Er is een dagdoel in sterren met een schatkist als het gehaald is, en een reeks van dagen op rij. Mist uw kind één dag, dan bewaart een schuilhut de reeks. Elke zeven dagen op rij levert er een op, met een maximum van twee. Je klimniveau volgt hoeveel sommen tegelijk beheerst zijn: 5, 12, 22, 35, 50, 65, 78, 90 en ten slotte alle 100. Bij elk nieuw niveau krijgt Mo iets nieuws. Tafelkoning, de kroon en de medaille Alle toppen vragen alle tien tafels. Een behaald niveau blijft bewaard; de tafelkaart toont wat nu herhaling nodig heeft. Sterren belonen het oefenen en het dagdoel, niet het klimniveau.'),
           h('p', null, 'Elke dag een korte ronde werkt beter dan af en toe lang oefenen. Daarom telt Tafelberg de dagen op rij.'),
           h('p', { class: 'set-small' }, pr.name + ': ' + pr.stats.rounds + (pr.stats.rounds === 1 ? ' ronde' : ' rondes') + ' op ' + pr.stats.days + (pr.stats.days === 1 ? ' dag' : ' dagen') + ', ' + masteredTotal() + ' van de 100 sommen zitten erin.')
         ])
