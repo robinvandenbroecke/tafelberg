@@ -1,6 +1,7 @@
 /* Browser + echte Edge-handler + Postgres, met nagebootste externe Auth-service. */
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium}=require('playwright'),{backend}=require('./supabase-edge.cjs');
+const {unlock}=require('./parent-helper.cjs');
 const endpoint='https://test.supabase.co/functions/v1/tafelberg';
 async function main(){
  const b=await backend();let hold=null;
@@ -29,7 +30,7 @@ async function main(){
   }
   async function local(p,name,stars){await p.getByRole('textbox',{name:'Naam',exact:true}).fill(name);await p.getByRole('button',{name:'Start de klim',exact:true}).click();await p.evaluate(stars=>{const a=Tafelberg.profile();a.settings.sound=false;a.settings.voice=false;a.stats.stars=stars;Tafelberg.save();},stars);}
   async function form(p,mode,name,password,options={}){
-   await p.evaluate(mode=>Tafelberg.go('cloud',{mode}),mode);await p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill(name+'@example.test');assert.equal(await p.getByLabel('Gebruikersnaam',{exact:true}).count(),0);await p.getByLabel('Wachtwoord',{exact:true}).fill(password);
+   await p.evaluate(mode=>Tafelberg.go('cloud',{mode}),mode);await unlock(p);await p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill(name+'@example.test');assert.equal(await p.getByLabel('Gebruikersnaam',{exact:true}).count(),0);await p.getByLabel('Wachtwoord',{exact:true}).fill(password);
    if(mode==='register'){
     if(options.empty)await p.getByRole('combobox',{name:'Voortgang bij account maken',exact:true}).selectOption('');
    }
@@ -46,7 +47,7 @@ async function main(){
   }
   async function settled(p){try { await p.waitForFunction(()=>{const m=JSON.parse(localStorage.getItem('tafelberg.supabase.v2')),a=m.links[Tafelberg.state().current];return a&&!a.dirty;},null,{timeout:15000}); } catch(e) {console.error(await p.evaluate(()=>({body:document.body.innerText,links:JSON.parse(localStorage.getItem('tafelberg.supabase.v2')).links,current:Tafelberg.state().current})));throw e;} }
   async function play(p,name){await p.getByRole('button',{name:'Spelen met '+name,exact:true}).click();await settled(p);}
-  async function account(p){await p.evaluate(()=>Tafelberg.go('cloud'));await p.getByRole('status').filter({hasText:'Klimmers bijgewerkt.'}).waitFor();}
+  async function account(p){await p.evaluate(()=>Tafelberg.go('cloud'));await unlock(p);await p.getByRole('status').filter({hasText:'Klimmers bijgewerkt.'}).waitFor();}
   async function upload(p,name,target=''){
    const id=await p.evaluate(name=>Object.values(Tafelberg.state().profiles).find(p=>p.name===name).id,name);
    await p.getByRole('combobox',{name:'Lokale klimmer meenemen',exact:true}).selectOption(id);
@@ -56,6 +57,29 @@ async function main(){
   // Echte tikken op een telefoon; het scherm wordt kleiner bij een open toetsenbord.
   const mobile=await device();await mobile.p.setViewportSize({width:412,height:915});
   await local(mobile.p,'OnePlus klimmer',3);
+  // Instellingen zijn ook zonder account afgeschermd; een fout antwoord wijzigt niets.
+  const beforeGate=await mobile.p.evaluate(()=>Tafelberg.exportBackup());
+  await mobile.p.getByRole('button',{name:'Instellingen',exact:true}).tap();
+  assert.equal(await mobile.p.evaluate(()=>Tafelberg.current().name),'parent');
+  assert(!/\d/.test(await mobile.p.locator('.parent-number').textContent()),'Het antwoord staat niet in cijfers in de opdracht');
+  const firstChallenge=await mobile.p.locator('.parent-number').textContent();
+  await mobile.p.getByRole('textbox',{name:'Getal in cijfers',exact:true}).fill('1');
+  await mobile.p.getByRole('button',{name:'Doorgaan',exact:true}).tap();
+  await mobile.p.getByRole('alert').filter({hasText:'Dat klopt niet'}).waitFor();
+  assert.notEqual(await mobile.p.locator('.parent-number').textContent(),firstChallenge);
+  assert.equal(await mobile.p.getByRole('switch').count(),0);
+  assert.equal(await mobile.p.evaluate(()=>Tafelberg.exportBackup()),beforeGate);
+  await unlock(mobile.p);
+  await mobile.p.getByRole('button',{name:'Mijn account',exact:true}).tap();
+  await mobile.p.getByRole('heading',{name:'Aanmelden',exact:true}).waitFor();
+  await mobile.p.getByRole('button',{name:'Terug',exact:true}).tap();
+  assert.equal(await mobile.p.evaluate(()=>Tafelberg.current().name),'settings');
+  await mobile.p.getByRole('button',{name:'Terug',exact:true}).tap();
+  await mobile.p.getByRole('button',{name:'Instellingen',exact:true}).tap();
+  await mobile.p.getByRole('button',{name:'Annuleren',exact:true}).tap();
+  assert.equal(await mobile.p.evaluate(()=>Tafelberg.current().name),'home');
+  assert.equal(await mobile.p.evaluate(()=>Tafelberg.exportBackup()),beforeGate);
+
   await mobile.p.getByRole('button',{name:'Aanmelden · voortgang bewaren',exact:true}).tap();
   await mobile.p.getByRole('button',{name:/^(Nieuw account maken|Account maken)$/}).tap();
   await mobile.p.getByRole('heading',{name:'Account maken',exact:true}).waitFor();
@@ -96,8 +120,16 @@ async function main(){
   await a.p.getByRole('button',{name:'Spelen met Alice',exact:true}).waitFor();
   const hector=await a.p.evaluate(()=>Tafelberg.state().current);
   await a.p.evaluate(()=>Tafelberg.go('home'));
+  assert.equal(await a.p.getByRole('button',{name:'Mijn account',exact:true}).count(),0);
+  await a.p.getByRole('button',{name:'Instellingen',exact:true}).click();await unlock(a.p);
   await a.p.getByRole('button',{name:'Mijn account',exact:true}).click();
   await a.p.getByRole('heading',{name:'alice@example.test',exact:true}).waitFor();
+  // Toegang sluit bij achtergrondgebruik; browsergeschiedenis/API-navigatie opent niets opnieuw.
+  await a.p.evaluate(()=>{Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});document.dispatchEvent(new Event('visibilitychange'));});
+  assert.equal(await a.p.evaluate(()=>Tafelberg.current().name),'parent');
+  await a.p.evaluate(()=>{Object.defineProperty(document,'visibilityState',{value:'visible',configurable:true});document.dispatchEvent(new Event('visibilitychange'));});
+  await unlock(a.p);await a.p.getByRole('heading',{name:'alice@example.test',exact:true}).waitFor();
+
   await a.p.evaluate(()=>Tafelberg.go('newPlayer'));await local(a.p,'Basil',7);await account(a.p);await upload(a.p,'Basil');
   const basil=await a.p.evaluate(()=>Tafelberg.state().current);assert.notEqual(basil,hector);
   let online=(await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data;
@@ -199,6 +231,21 @@ async function main(){
   await fresh.p.evaluate(()=>TBCloud.sync());await settled(fresh.p);
   assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name.trim().toLowerCase()==='dolores').stats.stars),40);
   assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-12'})).data.profiles[0].profile.settings.pace,'snel');
+  // Een eerder gebruikt account blijft na afmelden en herstart uit alle speelschermen.
+  await account(fresh.p);fresh.p.once('dialog',dialog=>dialog.accept());
+  await fresh.p.getByRole('button',{name:'Afmelden op dit toestel',exact:true}).click();
+  await fresh.p.evaluate(()=>Tafelberg.go('home'));await fresh.p.reload();
+  for(const screen of ['home','who','newPlayer']){
+    await fresh.p.evaluate(screen=>Tafelberg.go(screen),screen);
+    assert.equal(await fresh.p.getByRole('button',{name:/^(Mijn account|Aanmelden · voortgang bewaren)$/}).count(),0);
+  }
+  await fresh.p.evaluate(()=>Tafelberg.go('cloud'));
+  assert.equal(await fresh.p.evaluate(()=>Tafelberg.current().name),'parent','Accountbeheer vereist na herstart opnieuw oudercontrole');
+  // Een bestaand account blijft via instellingen bereikbaar zonder lokale klimmers.
+  await fresh.p.evaluate(()=>Tafelberg.restoreBackup(JSON.stringify({v:2,device:{eink:null},current:null,order:[],profiles:{}})));
+  await fresh.p.getByRole('button',{name:'Instellingen',exact:true}).click();await unlock(fresh.p);
+  await fresh.p.getByRole('button',{name:'Mijn account',exact:true}).click();
+  await fresh.p.getByRole('heading',{name:'Aanmelden',exact:true}).waitFor();
   for(const dev of [e,low,skip,fresh]){assert.deepEqual(dev.p.errors,[]);await dev.c.close();}
   const login=await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'});
   await a.p.goto('http://127.0.0.1:'+server.address().port+'/#type=recovery&access_token='+login.data.token+'&refresh_token='+login.data.refresh+'&expires_in=3600');

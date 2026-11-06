@@ -1573,3 +1573,8 @@ html.phone .who-main > .btn { font-size: 1rem; min-height: 44px; margin-top: 6px
 .home > .btn { flex: 0 0 auto; min-height: 44px; margin: 0.35rem 1.4rem 0; padding: 0.35rem 0.7rem; font-size: 1rem; }
 .np-card > .btn { width: 100%; min-height: 44px; margin-bottom: 0.7rem; }
 .cloud-card h2 { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Oudercontrole blijft leesbaar op smalle schermen en bij een open toetsenbord. */
+.parent-number { font-size: 1.35rem; font-weight: 800; overflow-wrap: anywhere; word-break: break-word; line-height: 1.5; }
+.parent-control .cloud-card { padding-bottom: 1.25rem; }
+.parent-control .cloud-field input { min-height: 44px; }

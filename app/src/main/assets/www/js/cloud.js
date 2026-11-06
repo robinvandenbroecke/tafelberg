@@ -183,6 +183,7 @@
     if (!safe()) { pendingLogin = { result: result, source: sourceId }; schedule(); return; }
     if (!result.account || !/^[a-f0-9-]{36}$/.test(result.account)) throw new Error('Ongeldig accountantwoord.');
     var account = result.account;
+    meta.accountUsed = true;
     meta.sessions[account] = { username: result.username, email: result.email || '', token: result.token, refresh: result.refresh, expires: result.expires, checked: Date.now(), message: 'Aangemeld.' };
     absorb(result, account); meta.lastEmail = result.email || '';
     if (meta.pending[result.email]) delete meta.pending[result.email];
@@ -241,7 +242,7 @@
       }
     }
     ui = { account: account, mode: mode, note: status };
-    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { api.go(api.state().current ? 'home' : 'newPlayer'); }), h('h1', null, 'Mijn account')]), h('div', { class: 'cloud-main' }, content)]));
+    root.appendChild(h('div', { class: 'screen settings cloud' }, [h('header', { class: 'bar' }, [button('Terug', function () { if (api.current().back) api.current().back(); }), h('h1', null, 'Mijn account')]), h('div', { class: 'cloud-main' }, content)]));
     if (!configured()) { content.appendChild(h('p', null, 'Online bewaren is nog niet beschikbaar. Je voortgang blijft op dit toestel.')); return; }
     if (mode === 'account' && s) {
       content.appendChild(h('h2', null, s.email || 'Mijn account'));
@@ -329,7 +330,7 @@
         if (!r.ok) { report(r.message || 'Aanmelden lukt nu niet.'); return; }
         if (mode === 'recover') { report(r.message); return; }
         if (r.confirmation) {
-          meta.pending[u] = { source: source }; meta.lastEmail = u;
+          meta.accountUsed = true; meta.pending[u] = { source: source }; meta.lastEmail = u;
           try { persist(); report(r.message); }
           catch (e) { report(r.message + ' De uploadkeuze kon niet worden onthouden. Je kunt je lokale voortgang na aanmelden toevoegen.'); }
           content.appendChild(button('Account bevestigd? Aanmelden', function () { api.go('cloud', { mode: 'login' }); })); return;
@@ -347,12 +348,13 @@
   }
   window.TBCloud = {
     configured: configured,
+    accountUsed: function () { return !!meta.accountUsed; },
     signedIn: function () { for (var id in meta.sessions) if (meta.sessions.hasOwnProperty(id)) return true; return false; },
     linked: function (id) { return !!meta.links[id]; },
     detach: function (id) { delete meta.links[id]; persist(); },
     init: function (app, dom) {
       api = app; h = dom;
-      try { var saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null'); if (saved && saved.sessions && saved.links) meta = saved; meta.pending = meta.pending || {}; meta.creates = meta.creates || {}; if (!meta.device) meta.device = random(); persist(); }
+      try { var saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null'); if (saved && saved.sessions && saved.links) meta = saved; meta.pending = meta.pending || {}; meta.creates = meta.creates || {}; if (!meta.device) meta.device = random(); meta.accountUsed = !!(meta.accountUsed || meta.lastEmail || Object.keys(meta.sessions).length || Object.keys(meta.links).length || Object.keys(meta.pending).length); persist(); }
       catch (e) { meta = { sessions: {}, links: {}, pending: {}, creates: {}, device: '' }; }
       try {
         var parts = location.hash.substring(1).split('&'), values = {};

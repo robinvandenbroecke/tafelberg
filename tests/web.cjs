@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const runtime=process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES;
 const {chromium,webkit}=require('playwright');
+const {unlock}=require('./parent-helper.cjs');
 const root=path.resolve('_site');
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.webmanifest':'application/manifest+json','.woff':'font/woff','.png':'image/png','.svg':'image/svg+xml','.mp3':'audio/mpeg'};
 const server=http.createServer((req,res)=>{
@@ -14,7 +15,7 @@ const server=http.createServer((req,res)=>{
  res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.setHeader('Cache-Control','no-cache');res.end(fs.readFileSync(file));
 });
 const sizes=[['iphone-se',375,667],['iphone15',393,852],['iphone15-land',852,393],['iphone-max',430,932],['pixel7',412,915],['pixel7-land',915,412],['s23-ultra',384,752],['s23-ultra-land',824,312],['ipad',820,1180],['ipad-land',1180,820],['ipad-pro',1024,1366],['ipad-pro-land',1366,1024],['split',507,1180],['tab-s3',768,1024],['tab-s3-land',1024,768],['boox',702,936],['iphone-se-land',667,375]];
-const screens=['who','newPlayer','home','table','ladder','practice','summary','celebrate','week','kast','speed','race','sprint','medals','chart','settings'];
+const screens=['who','newPlayer','home','table','ladder','practice','summary','celebrate','week','kast','speed','race','sprint','medals','chart','parent','settings'];
 let results=[],failures=[],errors=[];
 async function seed(page){
  await page.getByRole('textbox',{name:'Naam',exact:true}).fill('Klimmer');await page.getByRole('button',{name:'Start de klim'}).click();
@@ -28,7 +29,8 @@ async function visit(page,name){
  if(name==='sprint')p={now:true};
  if(name==='summary'){p.se=a.newSession([2,5,10]);p.se.thinks=[1500,2200];p.se.firstOk=12;p.se.stars=20;p.se.records=[];p.se.mastered=[];}
  if(name==='celebrate')a.pending().push({type:'item',data:{id:'muts'}});
- a.go(name,p);},name);
+ a.go(name==='parent'?'settings':name,p);},name);
+ if(name==='settings')await unlock(page);
  if(name==='race'){await page.getByRole('button',{name:'Start',exact:true}).click();await page.waitForSelector('.race .keypad',{timeout:10000});}
  if(name==='newPlayer')await page.locator('.np-start').scrollIntoViewIfNeeded();
  await page.waitForTimeout(40);
@@ -112,7 +114,7 @@ async function voiceAndCopies(browser,base){
   await p.evaluate(v=>{testVoices=v.map(lang=>({lang}));voiceListener();},voices);
   await p.locator('.home .bubble').click();assert.equal(await p.evaluate(()=>voiceCalls[voiceCalls.length-1]),want);
  }
- const raw=await p.evaluate(()=>Tafelberg.exportBackup());await p.evaluate(()=>Tafelberg.go('settings'));
+ const raw=await p.evaluate(()=>Tafelberg.exportBackup());await p.evaluate(()=>Tafelberg.go('settings'));await unlock(p);
  await p.getByRole('button',{name:'Kopie terugzetten',exact:true}).click();await p.getByRole('textbox',{name:'Kopie van de voortgang',exact:true}).fill(raw);
  p.once('dialog',d=>d.dismiss());await p.getByRole('button',{name:'Terugzetten',exact:true}).click();assert.equal(await p.evaluate(()=>Tafelberg.exportBackup()),raw);
  p.once('dialog',d=>d.accept());await p.getByRole('button',{name:'Terugzetten',exact:true}).click();assert.equal(await p.evaluate(()=>Tafelberg.current().name),'who');
