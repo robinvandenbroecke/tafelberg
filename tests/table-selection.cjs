@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const {unlock}=require('./parent-helper.cjs');
 
 async function main() {
   const root = path.resolve('app/src/main/assets/www');
@@ -36,6 +37,7 @@ async function main() {
         for (const t of p.settings.tables) for (let a = 1; a <= 10; a++) p.facts[a + 'x' + t] = { b: 4, n: 5, c: 5, due: 0, last: 0, rt: 1500 };
         Tafelberg.save(); Tafelberg.go('settings');
       }, seed);
+      await unlock(page);
     }
     await reset();
     await page.getByRole('button', { name: 'Tafel van 2', exact: true }).click();
@@ -53,7 +55,7 @@ async function main() {
       return Array.from({ length: 200 }, () => Tafelberg.pickNext(se).t);
     });
     assert(!questions.includes(2), 'De oefenpool bevat geen uitgezette tafel');
-    await page.evaluate(() => Tafelberg.go('settings'));
+    await page.evaluate(() => Tafelberg.go('settings'));await unlock(page);
     await page.getByRole('button', { name: 'Tafel van 2', exact: true }).click();
     assert.equal(await page.evaluate(() => Tafelberg.profile().settings.tables.includes(2)), true);
     assert.equal(await page.evaluate(() => Tafelberg.profile().settings.excludedTables.includes(2)), false);
@@ -96,7 +98,7 @@ async function main() {
     await page.evaluate(raw => {
       const old = JSON.parse(raw); delete old.profiles[old.current].settings.excludedTables;
       Tafelberg.restoreBackup(JSON.stringify(old)); Tafelberg.go('settings');
-    }, seed);
+    }, seed);await unlock(page);
     assert.deepEqual(await page.evaluate(() => Tafelberg.profile().settings.excludedTables), []);
     for (const invalid of [[0], [11], [2.5], ['2'], null, {}]) {
       assert.equal(await page.evaluate(value => {

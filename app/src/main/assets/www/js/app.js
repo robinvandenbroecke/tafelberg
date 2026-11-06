@@ -894,8 +894,53 @@
 
   // ---------------------------------------------------------------- schermen
   var screens = {};
+  var parentOpen = false, firstAccountFlow = false, parentTarget = null;
+  function accountUsed() { return window.TBCloud && window.TBCloud.accountUsed(); }
+  function parentArea(name) { return name === 'settings' || name === 'cloud'; }
+  function numberWords(n) {
+    var small = ['nul','een','twee','drie','vier','vijf','zes','zeven','acht','negen','tien','elf','twaalf','dertien','veertien','vijftien','zestien','zeventien','achttien','negentien'];
+    var tens = ['', '', 'twintig','dertig','veertig','vijftig','zestig','zeventig','tachtig','negentig'];
+    if (n < 20) return small[n];
+    if (n < 100) return n % 10 ? small[n % 10] + (n % 10 === 2 || n % 10 === 3 ? 'ën' : 'en') + tens[Math.floor(n / 10)] : tens[n / 10];
+    if (n < 1000) return (n < 200 ? '' : small[Math.floor(n / 100)]) + 'honderd' + (n % 100 ? numberWords(n % 100) : '');
+    return numberWords(Math.floor(n / 1000)) + 'duizend' + (n % 1000 ? numberWords(n % 1000) : '');
+  }
+  screens.parent = function () {
+    var target = parentTarget, answer, prompt = h('p', { class: 'parent-number' });
+    var input = h('input', { class: 'name-input', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '5', autocomplete: 'off', 'aria-label': 'Getal in cijfers', enterkeyhint: 'done' });
+    var status = h('p', { class: 'set-note', role: 'alert' });
+    current.back = function () { parentTarget = null; go(S.current ? 'home' : 'newPlayer'); };
+    function challenge() { var next = (21 + Math.floor(Math.random() * 78)) * 1000 + 100 + Math.floor(Math.random() * 900); if (next === answer) next = next === 98999 ? 21100 : next + 1; answer = next; prompt.textContent = numberWords(answer); input.value = ''; }
+    function checkAnswer(e) {
+      if (e) e.preventDefault();
+      if (input.value !== String(answer)) { challenge(); status.textContent = 'Dat klopt niet. Probeer dit nieuwe getal.'; input.focus(); return; }
+      input.blur(); parentOpen = true; parentTarget = null; go(target.name, target.params);
+    }
+    challenge();
+    root.appendChild(h('div', { class: 'screen settings parent-control' }, [
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Voor ouders'), null),
+      h('div', { class: 'cloud-main' }, h('form', { class: 'cloud-card', onsubmit: checkAnswer }, [
+        h('h2', null, 'Oudercontrole'), h('p', null, 'Typ dit getal in cijfers om verder te gaan.'), prompt,
+        h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, 'Getal in cijfers'), input]), status,
+        h('button', { class: 'btn btn-sun', type: 'submit' }, 'Doorgaan'),
+        h('button', { class: 'btn btn-line', type: 'button', onclick: current.back }, 'Annuleren')
+      ]))
+    ]));
+  };
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && parentOpen) {
+      parentOpen = false; firstAccountFlow = false;
+      if (current && parentArea(current.name)) go(current.name, current.params);
+    }
+  }, false);
 
   function go(name, params) {
+    var authLink = name === 'cloud' && params && (params.mode === 'reset' || params.mode === 'resume');
+    if (name === 'cloud' && !accountUsed()) firstAccountFlow = true;
+    if (!parentOpen && (name === 'settings' || name === 'cloud' && accountUsed() && !firstAccountFlow && !authLink)) {
+      parentTarget = { name: name, params: params || {} }; name = 'parent'; params = {};
+    }
+    if (!parentArea(name)) { parentOpen = false; firstAccountFlow = false; }
     clearTimers();
     stopSpeaking();
     keyHandler = null;
@@ -1179,7 +1224,7 @@
         h('div', { class: 'bar-side bar-right' }, right)
       ]),
       window.TBWeb ? h('div', { class: 'web-notices' }) : null,
-      cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'),
+      firstAccountButton(),
       rangeEl,
       h('div', { class: 'home-actions' }, [
         h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
@@ -1228,9 +1273,11 @@
   }
 
   screens.cloud = function (params) {
-    current.back = function () { go(S.current ? 'settings' : 'newPlayer'); };
+    current.back = function () { go(S.current ? (parentOpen ? 'settings' : 'home') : 'newPlayer'); };
     window.TBCloud.render(root, params);
   };
+
+  function firstAccountButton() { return !accountUsed() ? cloudButton('Aanmelden · voortgang bewaren') : null; }
 
   function cloudButton(label, params) {
     return window.TBCloud && window.TBCloud.configured() ? h('button', { class: 'btn btn-line', onclick: function () { go('cloud', params || {}); } }, label) : null;
@@ -1262,7 +1309,7 @@
     root.appendChild(h('div', { class: 'screen who' }, [
       topBar(current.back ? iconButton('back', 'Terug', current.back) : null,
         h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), null),
-      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'), cards]),
+      h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), firstAccountButton(), cards]),
       decoRange()
     ]));
   };
@@ -1301,7 +1348,7 @@
       topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), null),
       h('div', { class: 'np-main' }, [
         h('div', { class: 'np-card' }, [
-          cloudButton(window.TBCloud && window.TBCloud.signedIn() ? 'Mijn account' : 'Aanmelden · voortgang bewaren'),
+          firstAccountButton(),
           first ? h('p', { class: 'np-intro' }, 'Elke tafel is een berg. Wie de sommen vlot kent, klimt naar de top.') : null,
           h('div', { class: 'np-row' }, [
             preview,
@@ -3306,7 +3353,7 @@
           toggle('Geluid', null, function () { return !!st.sound; }, function (v) { st.sound = v; }),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Opnieuw beginnen'), h('span', { class: 'set-note' }, 'Wist alle niveaus, sterren en medailles van ' + pr.name + '.')]), resetBtn]),
           h('div', { class: 'set-row' }, [h('div', { class: 'set-text' }, [h('span', { class: 'set-label' }, 'Speler verwijderen'), h('span', { class: 'set-note' }, 'Haalt ' + pr.name + ' en alle voortgang weg.')]), removeBtn]),
-          window.TBCloud && window.TBCloud.configured() ? h('section', { class: 'set-block' }, [h('h2', null, 'Online bewaren'), h('p', { class: 'set-note' }, window.TBCloud.status(pr.id)), cloudButton('Online bewaren', { id: pr.id })]) : null,
+          window.TBCloud && window.TBCloud.configured() ? h('section', { class: 'set-block' }, [h('h2', null, 'Mijn account'), h('p', { class: 'set-note' }, window.TBCloud.status(pr.id)), cloudButton('Mijn account', { id: pr.id })]) : null,
           backupBlock(),
           h('h2', { class: 'set-head' }, 'Dit toestel'),
           toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { S.device.eink = v; applyTheme(); }),
