@@ -25,7 +25,7 @@ jobs:
       - run: npm run build:web
       - name: Ubuntu-pakketbron instellen
         run: |
-          for apt_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+          for apt_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/apt-mirrors.txt; do
             if [ -f "$apt_source_file" ]; then
               sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$apt_source_file"
             fi
