@@ -1273,7 +1273,7 @@
   }
 
   screens.cloud = function (params) {
-    current.back = function () { go(S.current ? (parentOpen ? 'settings' : 'home') : 'newPlayer'); };
+    current.back = function () { go(parentOpen ? 'settings' : (S.current ? 'home' : 'newPlayer')); };
     window.TBCloud.render(root, params);
   };
 
@@ -1308,7 +1308,7 @@
 
     root.appendChild(h('div', { class: 'screen who' }, [
       topBar(current.back ? iconButton('back', 'Terug', current.back) : null,
-        h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), null),
+        h('div', { class: 'brand' }, [icon('mountain'), h('span', { class: 'brand-name' }, 'Tafelberg')]), accountUsed() ? iconButton('gear', 'Instellingen', function () { go('settings'); }) : null),
       h('div', { class: 'who-main' }, [h('h1', null, 'Wie gaat er klimmen?'), firstAccountButton(), cards]),
       decoRange()
     ]));
@@ -1345,7 +1345,7 @@
     drawPreview();
 
     root.appendChild(h('div', { class: 'screen newplayer' }, [
-      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), null),
+      topBar(current.back ? iconButton('back', 'Terug', current.back) : null, h('h1', null, first ? 'Welkom bij Tafelberg' : 'Nieuwe klimmer'), accountUsed() ? iconButton('gear', 'Instellingen', function () { go('settings'); }) : null),
       h('div', { class: 'np-main' }, [
         h('div', { class: 'np-card' }, [
           firstAccountButton(),
@@ -3238,8 +3238,8 @@
 
   // ---------- instellingen: per speler en voor het toestel
   screens.settings = function () {
-    current.back = function () { go('home'); };
-    var pr = P(), st = pr.settings;
+    current.back = function () { go(S.current ? 'home' : 'newPlayer'); };
+    var pr = P(), st = pr && pr.settings;
 
     function toggle(label, note, get, set) {
       var btn = h('button', { class: 'switch' + (get() ? ' on' : ''), role: 'switch', 'aria-checked': get() ? 'true' : 'false', 'aria-label': label });
@@ -3266,6 +3266,18 @@
         action();
       }, false);
       return btn;
+    }
+
+    if (!pr) {
+      root.appendChild(h('div', { class: 'screen settings' }, [
+        topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Instellingen'), null),
+        h('div', { class: 'set-main' }, h('div', { class: 'set-col' }, [
+          h('h2', { class: 'set-head' }, 'Mijn account'), cloudButton('Mijn account'),
+          h('h2', { class: 'set-head' }, 'Dit toestel'),
+          toggle('E-inkweergave', 'Zwart-wit en zonder beweging. Staat vanzelf aan op een Boox.', function () { return einkOn(); }, function (v) { S.device.eink = v; applyTheme(); })
+        ]))
+      ]));
+      return;
     }
 
     var nameInput = h('input', { type: 'text', class: 'name-input', value: pr.name, maxlength: '20', autocomplete: 'off', 'aria-label': 'Naam' });

@@ -241,6 +241,11 @@ async function main(){
   }
   await fresh.p.evaluate(()=>Tafelberg.go('cloud'));
   assert.equal(await fresh.p.evaluate(()=>Tafelberg.current().name),'parent','Accountbeheer vereist na herstart opnieuw oudercontrole');
+  // Een bestaand account blijft via instellingen bereikbaar zonder lokale klimmers.
+  await fresh.p.evaluate(()=>Tafelberg.restoreBackup(JSON.stringify({v:2,device:{eink:null},current:null,order:[],profiles:{}})));
+  await fresh.p.getByRole('button',{name:'Instellingen',exact:true}).click();await unlock(fresh.p);
+  await fresh.p.getByRole('button',{name:'Mijn account',exact:true}).click();
+  await fresh.p.getByRole('heading',{name:'Aanmelden',exact:true}).waitFor();
   for(const dev of [e,low,skip,fresh]){assert.deepEqual(dev.p.errors,[]);await dev.c.close();}
   const login=await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'});
   await a.p.goto('http://127.0.0.1:'+server.address().port+'/#type=recovery&access_token='+login.data.token+'&refresh_token='+login.data.refresh+'&expires_in=3600');
