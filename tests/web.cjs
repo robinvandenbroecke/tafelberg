@@ -120,6 +120,18 @@ async function voiceAndCopies(browser,base){
  p.once('dialog',d=>d.accept());await p.getByRole('button',{name:'Terugzetten',exact:true}).click();assert.equal(await p.evaluate(()=>Tafelberg.current().name),'who');
  assert.equal(await p.evaluate(()=>Tafelberg.profile().name),'Klimmer');await c.close();
 }
+async function parentHistory(browser,base){
+ const c=await browser.newContext({viewport:{width:393,height:852},userAgent:'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36'});
+ const p=await c.newPage();await p.goto(base);await seed(p);const homeIndex=await p.evaluate(()=>history.state.tafelberg);
+ await p.getByRole('button',{name:'Instellingen',exact:true}).click();await unlock(p);
+ assert.equal(await p.evaluate(()=>Tafelberg.current().name),'settings');
+ await p.goBack();await p.waitForFunction(()=>Tafelberg.current().name==='parent');
+ await unlock(p);assert.equal(await p.evaluate(()=>Tafelberg.current().name),'settings','Een ouderopdracht uit de browsergeschiedenis heeft een geldige bestemming');
+ await p.getByRole('button',{name:'Terug',exact:true}).click();await p.waitForFunction(()=>Tafelberg.current().name==='home');await p.waitForFunction(n=>history.state.tafelberg===n,homeIndex);
+ await p.goForward();await p.waitForFunction(()=>Tafelberg.current().name==='parent');
+ await unlock(p);assert.equal(await p.evaluate(()=>Tafelberg.current().name),'settings','Vooruitnavigatie omzeilt de oudercontrole niet');
+ await c.close();
+}
 async function installation(browser,base){
  const variants=[['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1','iPhone',5,'ios-safari'],['ipad','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15','MacIntel',5,'ipad'],['ios-chrome','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) AppleWebKit/605.1.15 CriOS/130.0 Mobile/15E148 Safari/604.1','iPhone',5,'ios-chrome'],['android','Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36','Linux',5,'android-menu'],['whatsapp','Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 WhatsApp/2.0','iPhone',5,'in-app'],['desktop','Mozilla/5.0 Chrome/130 Safari/537.36','Linux',0,'desktop']];
  for(const [name,ua,platform,touch,expected] of variants){const c=await browser.newContext({userAgent:ua,viewport:{width:393,height:852}});await c.addInitScript(({platform,touch})=>{Object.defineProperty(navigator,'platform',{value:platform});Object.defineProperty(navigator,'maxTouchPoints',{value:touch});},{platform,touch});const page=await c.newPage();await page.goto(base+'installeer/');assert.equal(await page.locator('#instructions').getAttribute('data-device'),expected);
@@ -138,7 +150,7 @@ async function functional(browser,base){
  const apk=await c.newPage();await apk.addInitScript(()=>{window.AndroidStore={get:()=>null,set:()=>{window.savedAndroid=true;}};});await apk.goto('file://'+path.resolve('app/src/main/assets/www/index.html'));await seed(apk);assert(await apk.evaluate(()=>window.savedAndroid));assert.equal(await apk.locator('link[rel="manifest"]').count(),0);assert.equal(await apk.evaluate(()=>!!window.TBWeb),false);await c.close();
 }
 (async()=>{fs.mkdirSync('test-results/screens',{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;const base=`http://127.0.0.1:${port}/tafelberg/`;
- try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await changingViewport(b,type,base);await voiceAndCopies(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
+ try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await changingViewport(b,type,base);await voiceAndCopies(b,base);await parentHistory(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
  finally{server.close();fs.writeFileSync('test-results/layout.json',JSON.stringify({results,failures,errors},null,2));}
  console.log(JSON.stringify({screens:results.length,failures:failures.length,errors},null,2));if(failures.length){console.log(JSON.stringify(failures.slice(0,20),null,2));process.exitCode=1;}if(errors.length)process.exitCode=1;
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

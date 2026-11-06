@@ -906,7 +906,7 @@
     return numberWords(Math.floor(n / 1000)) + 'duizend' + (n % 1000 ? numberWords(n % 1000) : '');
   }
   screens.parent = function () {
-    var target = parentTarget, answer, prompt = h('p', { class: 'parent-number' });
+    var target = parentTarget || { name: 'settings', params: {} }, answer, prompt = h('p', { class: 'parent-number' });
     var input = h('input', { class: 'name-input', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '5', autocomplete: 'off', 'aria-label': 'Getal in cijfers', enterkeyhint: 'done' });
     var status = h('p', { class: 'set-note', role: 'alert' });
     current.back = function () { parentTarget = null; go(S.current ? 'home' : 'newPlayer'); };
