@@ -20,6 +20,7 @@ var TBProgress = (function () {
     var chosen = clone(compare(local, remote) > 0 ? local : remote), key;
     chosen.id = remote.id; chosen.name = remote.name; chosen.color = remote.color; chosen.settings = clone(remote.settings);
     chosen.stats.mo = clone(remote.stats.mo || {});
+    if (typeof TBRewards !== 'undefined') { TBRewards.merge(chosen, remote); TBRewards.merge(chosen, local); }
     if (!base) return chosen;
     function changed(value, old, server) { return !same(value, old) && (afterRequest || same(server, old)); }
     for (key in local.settings) if (Object.prototype.hasOwnProperty.call(local.settings, key) && key !== 'tables' && key !== 'excludedTables') {
