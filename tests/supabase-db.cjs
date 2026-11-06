@@ -17,7 +17,7 @@ async function fixture(){
   catch(e){await db.exec('rollback');throw e;}
  }
  const first={};
- async function playerSync(user,profile=null,revision=0,pid=null,create=false,key=null){return (await as(user,'select public.tb_sync($1::jsonb,$2,$3,$4,$5) as result',[profile&&JSON.stringify(profile),revision,pid,create,key])).rows[0].result;}
+ async function playerSync(user,profile=null,revision=0,pid=null,create=false,key=null,base=null){return (await as(user,'select public.tb_sync($1::jsonb,$2,$3,$4,$5,$6::jsonb) as result',[profile&&JSON.stringify(profile),revision,pid,create,key,base&&JSON.stringify(base)])).rows[0].result;}
  async function list(user){return (await as(user,'select public.tb_list_profiles() as result')).rows[0].result;}
  async function create(user,profile=null,key='c'+require('node:crypto').randomBytes(32).toString('hex')){return playerSync(user,profile,0,null,true,key);}
  async function sync(user,profile=null,revision=0){if(!first[user]){const r=await create(user,profile);first[user]=r.user;return r;}return playerSync(user,profile,revision,first[user]);}
@@ -66,6 +66,40 @@ async function test(){
  assert.equal((await db.query("select public.tb_rate_limit('unit-test',1,60) as ok")).rows[0].ok,true);
  assert.equal((await db.query("select public.tb_rate_limit('unit-test',1,60) as ok")).rows[0].ok,false);
  await db.exec('rollback');
+ // Instellingen reizen mee ongeacht de score, met een drie-wegvergelijking.
+ const D='44444444-4444-4444-8444-444444444444';
+ await db.query("insert into auth.users values($1,'settings@example.test','{}')",[D]);
+ const initial=await create(D,{...profile(10),name:'Hector'}),base=initial.profile;
+ const advanced={...base,stats:{stars:90,rounds:8}};
+ const newer=await playerSync(D,advanced,initial.revision,initial.user);
+ const offline=JSON.parse(JSON.stringify(base));offline.settings={tables:[4,8],excludedTables:[2,5,10],len:20,pace:'rustig',auto:false,tempo:false,div:true,sound:false,voice:false,vibrate:true,goal:'groot'};offline.color=3;offline.stats.mo={hat:'blue'};
+ const saved=await playerSync(D,offline,initial.revision,initial.user,false,null,base);
+ assert.equal(saved.profile.stats.stars,90);assert.deepEqual(saved.profile.settings,offline.settings);assert.equal(saved.profile.color,3);assert.deepEqual(saved.profile.stats.mo,{hat:'blue'});
+ const retry=await playerSync(D,offline,initial.revision,initial.user,false,null,base);
+ assert.equal(retry.revision,saved.revision,'Herhaalde instellingen-upload is idempotent');
+ const stale=JSON.parse(JSON.stringify(base));stale.stats.stars=100;
+ const kept=await playerSync(D,stale,initial.revision,initial.user,false,null,base);
+ assert.deepEqual(kept.profile.settings,offline.settings,'Meer sterren overschrijven geen nieuwere voorkeuren');
+ const conflict=JSON.parse(JSON.stringify(base));conflict.settings.pace='snel';
+ assert.equal((await playerSync(D,conflict,initial.revision,initial.user,false,null,base)).profile.settings.pace,'rustig','Gelijktijdig gewijzigd veld behoudt bevestigde serverwaarde');
+ // Dubbelen binnen hetzelfde account, geen optelling; oud ID en aanvraag-ID blijven bruikbaar.
+ const duplicate={...profile(5),name:'  HECTOR  ',settings:{...offline.settings,goal:'klein'},facts:{'2x4':{b:3,n:7,last:200}}};
+ const dupKey='c'+'d'.repeat(64),merged=await create(D,duplicate,dupKey);
+ assert.equal((await list(D)).profiles.length,1);assert.equal(merged.profile.stats.stars,100);
+ assert.equal(merged.profile.settings.goal,'klein');assert(merged.profile.facts['2x4']);assert(merged.profile.facts['3x5']);
+ assert.equal((await create(D,{...duplicate,stats:{stars:999}},dupKey)).profile.stats.stars,100,'Herhaalde aanmaak telt niet opnieuw mee');
+ const oldId=merged.user===initial.user?merged.merged[0]:initial.user;
+ const oldRead=await playerSync(D,null,0,oldId);assert.equal(oldRead.user,merged.user);
+ const oldWrite=await playerSync(D,{...duplicate,stats:{stars:120}},0,oldId);assert.equal(oldWrite.user,merged.user);assert.equal(oldWrite.profile.stats.stars,120);
+ await assert.rejects(playerSync(B,null,0,oldId),'Alias geeft geen toegang tot een ander account');
+ const distinct=await create(D,{...profile(),name:'Andere'});
+ const rename={...distinct.profile,name:'hector'};
+ await playerSync(D,rename,distinct.revision,distinct.user,false,null,distinct.profile);
+ assert.equal((await list(D)).profiles.length,1,'Ook hernoemen voegt dezelfde namen samen');
+ // Bestaande dubbelen worden bij ophalen samengevoegd en de oorspronkelijke rijen blijven bewaard.
+ await db.query("insert into public.tafelberg_progress(owner_id,profile_id,profile) values($1,'plegacy',$2::jsonb)",[D,JSON.stringify({...profile(150),id:'plegacy',name:'Hector'})]);
+ const migrated=await list(D);assert.equal(migrated.profiles.length,1);assert.equal(migrated.profiles[0].profile.stats.stars,150);
+ assert((await db.query('select count(*)::int as n from public.tafelberg_progress where owner_id=$1 and merged_into is not null',[D])).rows[0].n>=3);
  console.log('Supabase Postgres: gebruikersscheiding, RLS, rolrechten, verste versie, revisies, herhalingen, validatie en limieten geslaagd.');
  }finally{await db.close();}
 }

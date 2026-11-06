@@ -19,8 +19,8 @@ export function createHandler(config, fetcher = fetch) {
     return r.ok && r.data === true;
   }
   function session(data) { return { token: data.access_token, refresh: data.refresh_token, expires: Date.now() + data.expires_in * 1000 }; }
-  async function progress(token, candidate = null, revision = 0, player = null, createNew = false, createKey = null) {
-    const r = await call('/rest/v1/rpc/tb_sync', { candidate, base_revision: revision, requested_profile: player, create_new: createNew, request_key: createKey }, token);
+  async function progress(token, candidate = null, revision = 0, player = null, createNew = false, createKey = null, baseProfile = null) {
+    const r = await call('/rest/v1/rpc/tb_sync', { candidate, base_revision: revision, requested_profile: player, create_new: createNew, request_key: createKey, base_profile: baseProfile }, token);
     if (!r.ok) return { ok: false, message: r.status === 401 ? 'Meld je opnieuw aan.' : 'Voortgang kon niet worden bewaard. Je lokale voortgang blijft behouden.', authExpired: r.status === 401 };
     return r.data;
   }
@@ -100,7 +100,7 @@ export function createHandler(config, fetcher = fetch) {
       if (action === 'resume' || action === 'list') return reply(await list(input.token));
       if (action !== 'create' && (typeof input.player !== 'string' || !/^p[a-zA-Z0-9]{1,100}$/.test(input.player))) return reply({ ok: false, message: 'Kies een klimmer.' }, 400);
       return reply(await progress(input.token, action === 'write' || action === 'create' ? input.profile || null : null,
-        Number.isSafeInteger(input.revision) ? input.revision : 0, input.player || null, action === 'create', input.changeId || null));
+        Number.isSafeInteger(input.revision) ? input.revision : 0, input.player || null, action === 'create', input.changeId || null, input.baseProfile || null));
     } catch {
       // Geen wachtwoorden, tokens of interne foutmeldingen in logs of antwoorden.
       return reply({ ok: false, message: 'Online bewaren lukt nu niet. Je lokale voortgang blijft behouden.' }, 503);

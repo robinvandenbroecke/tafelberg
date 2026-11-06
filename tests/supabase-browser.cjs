@@ -123,6 +123,29 @@ async function main(){
   await a.p.evaluate(()=>{const m=JSON.parse(localStorage.getItem('tafelberg.supabase.v2'));Object.values(m.sessions)[0].expires=0;localStorage.setItem('tafelberg.supabase.v2',JSON.stringify(m));});
   await a.p.reload();await a.p.evaluate(()=>TBCloud.sync());await a.p.waitForFunction(token=>Object.values(JSON.parse(localStorage.getItem('tafelberg.supabase.v2')).sessions)[0].token!==token,oldToken);await settled(a.p);
   assert.equal(await a.p.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('tafelberg.supabase.v2')).sessions).length),1);
+  // Alle voorkeuren, inclusief leerinstellingen, komen van het toestel met de wijziging,
+  // ook als dat toestel minder voortgang en een oudere revisie heeft.
+  await d.c.setOffline(true);
+  await a.p.evaluate(()=>{Tafelberg.profile().stats.stars=60;Tafelberg.state().device.eink=true;Tafelberg.save();TBCloud.sync();});await settled(a.p);
+  const prefs={tables:[4,8],excludedTables:[2,5,10],len:20,div:true,sound:false,vibrate:true,auto:false,pace:'rustig',tempo:false,goal:'groot',voice:false};
+  await d.p.evaluate(prefs=>{Tafelberg.profile().stats.stars=51;Tafelberg.profile().settings=prefs;Tafelberg.profile().stats.mo={hat:'blue'};Tafelberg.state().device.eink=false;Tafelberg.save();},prefs);
+  await d.c.setOffline(false);await d.p.evaluate(()=>TBCloud.sync());await settled(d.p);
+  assert.equal(await d.p.evaluate(()=>Tafelberg.profile().stats.stars),60);
+  assert.deepEqual(await d.p.evaluate(()=>Tafelberg.profile().settings),prefs);
+  await a.p.evaluate(()=>TBCloud.sync());await a.p.waitForFunction(()=>Tafelberg.profile().settings.pace==='rustig');await settled(a.p);
+  assert.deepEqual(await a.p.evaluate(()=>Tafelberg.profile().settings),prefs);
+  assert.deepEqual(await a.p.evaluate(()=>Tafelberg.profile().stats.mo),{hat:'blue'});
+  assert.equal(await a.p.evaluate(()=>Tafelberg.state().device.eink),true);
+  assert.equal(await d.p.evaluate(()=>Tafelberg.state().device.eink),false,'E-ink blijft per toestel');
+  assert.notEqual(await a.p.evaluate(basil=>Tafelberg.state().profiles[basil].settings.pace,basil),'rustig','Instellingen blijven per klimmer');
+  // Een wijziging tijdens een lopend verzoek moet na het antwoord opnieuw verzonden worden.
+  hold={};await d.p.evaluate(()=>{Tafelberg.profile().settings.goal='klein';Tafelberg.save();TBCloud.sync();});
+  for(let i=0;i<100&&!hold.deliver;i++)await new Promise(r=>setTimeout(r,20));assert(hold.deliver);
+  await d.p.evaluate(()=>{Tafelberg.profile().settings.goal='gewoon';Tafelberg.save();Tafelberg.go('practice',{tables:[4],from:'table'});});
+  const heldCount=await d.p.evaluate(()=>window.completedCloud);await hold.deliver();hold=null;await d.p.waitForFunction(n=>window.completedCloud>n,heldCount);
+  assert.equal(await d.p.evaluate(()=>Tafelberg.profile().settings.goal),'gewoon');
+  await d.p.evaluate(()=>{Tafelberg.go('home');TBCloud.sync();});await settled(d.p);
+  assert.equal((await b.playerSync(require('./supabase-db.cjs').A,null,0,hector)).profile.settings.goal,'gewoon');
   const backup=await a.p.evaluate(()=>Tafelberg.exportBackup());assert(!/access-|refresh-|password-123|token|refresh/.test(backup));
   await account(a.p);
   assert.equal(await a.p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -136,7 +159,7 @@ async function main(){
   await a.p.getByRole('heading',{name:'Wachtwoord vergeten',exact:true}).waitFor();await a.p.getByRole('textbox',{name:'E-mailadres',exact:true}).fill('alice@example.test');await a.p.getByRole('button',{name:'Herstelmail versturen',exact:true}).click();await a.p.getByRole('status').filter({hasText:'Als dit account bestaat'}).waitFor();
   // Aanmelden doet op zichzelf geen upload. De gebruiker kiest de lokale bron en het kind.
   const e=await device();await local(e.p,'Lokale Alice',80);await form(e.p,'login','alice','Alice-password-123');
-  assert.equal((await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data.profiles.find(p=>p.user===hector).profile.stats.stars,50);
+  assert.equal((await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'})).data.profiles.find(p=>p.user===hector).profile.stats.stars,60);
   await upload(e.p,'Lokale Alice',hector);assert.equal(await e.p.evaluate(()=>Tafelberg.profile().stats.stars),80);assert.equal(await e.p.evaluate(()=>Tafelberg.state().order.length),2);
   // Minder lokale voortgang blijft afzonderlijk bewaard; Basil wordt niet teruggezet.
   const low=await device();await local(low.p,'Beginnende Basil',5);await form(low.p,'login','alice','Alice-password-123');await upload(low.p,'Beginnende Basil',basil);
@@ -151,6 +174,31 @@ async function main(){
   await fresh.p.getByRole('textbox',{name:'Naam van nieuwe klimmer',exact:true}).fill('Dolores');await fresh.p.getByRole('button',{name:'Nieuwe klimmer maken',exact:true}).click();
   await fresh.p.getByRole('button',{name:'Spelen met Dolores',exact:true}).waitFor();await settled(fresh.p);assert.equal(await fresh.p.evaluate(()=>Tafelberg.profile().stats.stars),0);
   assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name==='Bewaar lokaal').stats.stars),90);
+  // Dezelfde naam aanmaken of een losse lokale klimmer met die naam meenemen
+  // maakt binnen het account één klimmer; een ander account blijft onafhankelijk.
+  await fresh.p.getByRole('textbox',{name:'Naam van nieuwe klimmer',exact:true}).fill(' dolores ');
+  await fresh.p.getByRole('button',{name:'Nieuwe klimmer maken',exact:true}).click();await settled(fresh.p);
+  assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-12'})).data.profiles.length,1);
+  await fresh.p.evaluate(()=>Tafelberg.go('newPlayer'));await local(fresh.p,'DOLORES',9);await account(fresh.p);await upload(fresh.p,'DOLORES');
+  const freshAccount=(await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-12'})).data;
+  assert.equal(freshAccount.profiles.length,1);assert.equal(freshAccount.profiles[0].profile.stats.stars,9);
+  assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).filter(p=>p.name.trim().toLowerCase()==='dolores').length),1);
+  // Een oud toestel met beide ID's houdt ook zijn nog niet verzonden wijzigingen.
+  const legacy={...freshAccount.profiles[0].profile,id:'plegacybrowser',stats:{...freshAccount.profiles[0].profile.stats,stars:30}};
+  await b.db.query('insert into public.tafelberg_progress(owner_id,profile_id,profile) values($1,$2,$3::jsonb)',[freshAccount.account,legacy.id,JSON.stringify(legacy)]);
+  await fresh.p.evaluate(({legacy,account})=>{
+    Tafelberg.cloudImport(legacy,false);
+    const m=JSON.parse(localStorage.getItem('tafelberg.supabase.v2'));
+    m.links[legacy.id]={account,revision:1,base:JSON.stringify(legacy),dirty:true};
+    Tafelberg.state().profiles[legacy.id].stats.stars=40;
+    Tafelberg.state().profiles[legacy.id].settings.pace='snel';Tafelberg.save();
+    localStorage.setItem('tafelberg.supabase.v2',JSON.stringify(m));
+  },{legacy,account:freshAccount.account});
+  await fresh.p.reload();await account(fresh.p);await settled(fresh.p);
+  await fresh.p.waitForFunction(()=>Object.values(Tafelberg.state().profiles).filter(p=>p.name.trim().toLowerCase()==='dolores').length===1);
+  await fresh.p.evaluate(()=>TBCloud.sync());await settled(fresh.p);
+  assert.equal(await fresh.p.evaluate(()=>Object.values(Tafelberg.state().profiles).find(p=>p.name.trim().toLowerCase()==='dolores').stats.stars),40);
+  assert.equal((await b.rpc({action:'login',email:'fresh@example.test',password:'Fresh-12'})).data.profiles[0].profile.settings.pace,'snel');
   for(const dev of [e,low,skip,fresh]){assert.deepEqual(dev.p.errors,[]);await dev.c.close();}
   const login=await b.rpc({action:'login',email:'alice@example.test',password:'Alice-password-123'});
   await a.p.goto('http://127.0.0.1:'+server.address().port+'/#type=recovery&access_token='+login.data.token+'&refresh_token='+login.data.refresh+'&expires_in=3600');

@@ -39,7 +39,7 @@ async function backend(){
   if(u.pathname==='/rest/v1/rpc/tb_sync'){
    assert.equal(opts.headers.apikey,'public-key','Voortgang gebruikt de gebruikerssessie, niet de beheersleutel');
    const user=tokens[token];if(!user)return response({},401);
-   try{return response(await f.playerSync(user.id,data.candidate,data.base_revision,data.requested_profile,data.create_new,data.request_key));}catch{return response({},400);}
+   try{return response(await f.playerSync(user.id,data.candidate,data.base_revision,data.requested_profile,data.create_new,data.request_key,data.base_profile));}catch{return response({},400);}
   }
   throw Error('Onverwacht verzoek: '+u.pathname);
  }
