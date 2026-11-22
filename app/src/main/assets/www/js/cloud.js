@@ -96,9 +96,14 @@
   }
   function absorb(result, account) {
     if (!result || result.account !== account || !Array.isArray(result.profiles) || result.profiles.length > 50) throw new Error('Ongeldige accountgegevens.');
+    function cards() {
+      return snapshot(api.state().order.map(function (id) { return [id, profile(id).name]; }));
+    }
+    var previous = api.current().name === 'who' ? cards() : null;
     for (var i = 0; i < result.profiles.length; i++) install(result.profiles[i], account, false);
     if (typeof result.email === 'string') meta.sessions[account].email = result.email;
     meta.sessions[account].checked = Date.now(); persist();
+    if (previous !== null && cards() !== previous) api.go('who');
   }
   function redraw(account) { if (api.current().name === 'cloud' && ui && ui.mode === 'account' && ui.account === account) show(document.getElementById('app'), { mode: 'account', account: account, cached: true }); }
   function refreshAccount(account) {
@@ -203,10 +208,15 @@
     }
     var selected = api.state().current, link = meta.links[selected];
     for (var pid in meta.links) if (meta.links.hasOwnProperty(pid) && profile(pid) && meta.links[pid].dirty) { selected = pid; link = meta.links[pid]; break; }
+    if (safe() && (!link || !link.dirty)) {
+      var accounts = Object.keys(meta.sessions);
+      for (var i = 0; i < accounts.length; i++) {
+        if (Date.now() - (meta.sessions[accounts[i]].checked || 0) >= 60000) { refreshAccount(accounts[i]); return; }
+      }
+    }
     if (!link || !profile(selected) || !meta.sessions[link.account]) return;
     var session = meta.sessions[link.account], writing = snapshot(profile(selected)) !== link.base;
     if (!writing && !safe()) return;
-    if (!writing && Date.now() - (session.checked || 0) > 60000) { refreshAccount(link.account); return; }
     var sentSnapshot = { player: selected, profile: clone(profile(selected)) };
     var request = { action: writing ? 'write' : 'read', token: session.token, player: selected, revision: link.revision };
     if (writing) { request.profile = clone(profile(selected)); request.baseProfile = TBProgress.preferences(JSON.parse(link.base)); }

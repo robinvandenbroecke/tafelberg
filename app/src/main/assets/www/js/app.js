@@ -3386,7 +3386,7 @@
     document.addEventListener('contextmenu', function (e) { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); }, false);
     if (window.TBWeb) window.TBWeb.init(window.Tafelberg);
     if (window.TBCloud) window.TBCloud.init(window.Tafelberg, h);
-    if (!S.order.length) go('newPlayer');
+    if (!S.order.length) go(window.TBCloud && window.TBCloud.signedIn() ? 'who' : 'newPlayer');
     else if (S.order.length > 1) go('who');
     else go('home');
   }
