@@ -1178,6 +1178,7 @@
       ? [rangeRow([1, 2, 3, 4, 5], true), rangeRow([6, 7, 8, 9, 10], true)]
       : rangeRow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], false));
     var sun = s('svg', { viewBox: '0 0 40 40', class: 'sun', 'aria-hidden': 'true' }, s('circle', { cx: 20, cy: 20, r: 14 }));
+    var completed = TBRewards.best(pr) === 100;
     var label = st.tables.length === 1 ? 'de tafel van ' + st.tables[0] : 'tafels van ' + listNl(st.tables);
     var streak = currentStreak();
     var line = homeLine(pr);
@@ -1206,9 +1207,9 @@
       firstAccountButton(),
       rangeEl,
       h('div', { class: 'home-actions' }, [
-        h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
-          h('span', { class: 'btn-title' }, 'Oefenen'),
-          h('span', { class: 'btn-sub' }, label)
+        h('button', { class: 'btn btn-sun btn-big btn-main', onclick: function () { if (completed) go('beyond'); else go('practice', { tables: st.tables.slice(), from: 'home' }); } }, [
+          h('span', { class: 'btn-title' }, completed ? 'Verder na Tafelberg' : 'Oefenen'),
+          h('span', { class: 'btn-sub' }, completed ? 'Grotere sommen en RekenRinkel' : label)
         ]),
         h('button', { class: 'btn btn-ice btn-big btn-tile btn-speed', onclick: function () { go('speed'); } }, [icon('bolt'), h('span', { class: 'btn-title' }, 'Snelheid')]),
         h('button', { class: 'btn btn-ice btn-big btn-tile', onclick: function () { go('medals'); } }, [icon('medal'), h('span', { class: 'btn-title' }, 'Medailles')]),
@@ -1224,6 +1225,72 @@
         add(peaks, [rangeRow([1, 2, 3, 4, 5], true), rangeRow([6, 7, 8, 9, 10], true)]);
       }
     }
+  };
+
+  function rekenRinkelLink(pr) {
+    var linked = window.TBCloud && window.TBCloud.linked(pr.id) && /^p[a-zA-Z0-9]{1,100}$/.test(pr.id);
+    return h('a', { class: 'btn btn-sun', href: 'https://rekenrinkel.onrender.com/#tafelberg' + (linked ? '=' + pr.id : ''),
+      onclick: function () { saveState(); if (window.TBCloud) window.TBCloud.sync(); } }, 'Verder in RekenRinkel');
+  }
+
+  screens.beyond = function () {
+    var pr = P(), complete = TBRewards.best(pr) === 100;
+    current.back = function () { go('home'); };
+    root.appendChild(h('div', { class: 'screen settings' }, [
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Verder na Tafelberg'), null),
+      h('div', { class: 'cloud-main' }, h('div', { class: 'cloud-card beyond-card' }, complete ? [
+        h('h2', null, 'Alle tien tafels behaald!'),
+        rekenRinkelLink(pr),
+        h('p', null, 'Zin in een extra uitdaging? Splits grotere sommen, zoals 6 × 12 en 11 × 11.'),
+        h('button', { class: 'btn btn-line', onclick: function () { go('beyondPractice'); } }, 'Oefen grotere sommen'),
+        h('button', { class: 'btn btn-line', onclick: function () { go('practice', { tables: pr.settings.tables.slice(), from: 'home' }); } }, 'Herhaal mijn tafels')
+      ] : [h('p', null, 'Beheers eerst alle tien tafels.')]))
+    ]));
+  };
+
+  screens.beyondPractice = function () {
+    var pr = P();
+    current.back = function () { go('beyond'); };
+    var problems = [[4,11],[6,12],[8,12],[5,19],[7,21],[9,18],[11,11],[11,12],[12,12]];
+    var index = 0;
+    var card = h('div', { class: 'cloud-card beyond-card' });
+    function draw() {
+      card.innerHTML = '';
+      if (index === problems.length) {
+        add(card, [h('h2', null, 'Grotere sommen gelukt!'), rekenRinkelLink(pr),
+          h('button', { class: 'btn btn-line', onclick: current.back }, 'Terug naar de top')]);
+        return;
+      }
+      var x = problems[index][0], y = problems[index][1], tens = Math.floor(y / 10) * 10, units = y % 10;
+      var input = h('input', { class: 'name-input', type: 'text', inputmode: 'numeric', maxlength: '3', autocomplete: 'off', 'aria-label': 'Uitkomst' });
+      var feedback = h('p', { role: 'status' });
+      function showHint(prefix) {
+        feedback.textContent = prefix + 'Splits ' + y + ' in ' + tens + ' en ' + units + '. Reken ' + (x * tens) + ' + ' + (x * units) + '.';
+      }
+      function submit(event) {
+        event.preventDefault();
+        if (!/^\d{1,3}$/.test(input.value.trim()) || Number(input.value) !== x * y) {
+          showHint('Probeer opnieuw. '); input.select(); return;
+        }
+        index++; draw();
+        var next = card.querySelector('input');
+        if (next) next.focus(); else card.querySelector('a').focus();
+      }
+      add(card, [h('p', null, 'Som ' + (index + 1) + ' van ' + problems.length),
+        h('form', { onsubmit: submit }, [
+          h('label', { class: 'cloud-field' }, [h('span', { class: 'set-label' }, x + ' × ' + y + ' ='), input]),
+          h('button', { class: 'btn btn-sun', type: 'submit' }, 'Controleer'),
+          h('button', { class: 'btn btn-line', type: 'button', onclick: function () { showHint(''); } }, 'Toon de splitsing'),
+          feedback
+        ])
+      ]);
+    }
+    if (TBRewards.best(pr) === 100) draw();
+    else add(card, h('p', null, 'Beheers eerst alle tien tafels.'));
+    root.appendChild(h('div', { class: 'screen settings' }, [
+      topBar(iconButton('back', 'Terug', current.back), h('h1', null, 'Grotere sommen'), null),
+      h('div', { class: 'cloud-main' }, card)
+    ]));
   };
 
   // ---------- week: dagen op rij en schuilhutten
@@ -2228,7 +2295,7 @@
         ]),
         h('div', { class: 'sum-blocks' }, blocks)
       ]),
-      h('div', { class: 'sum-foot' }, endButtons(again, 'Nog een ronde'))
+      h('div', { class: 'sum-foot' }, endButtons(TBRewards.best(pr) === 100 ? function () { go('beyond'); } : again, TBRewards.best(pr) === 100 ? 'Verder na Tafelberg' : 'Nog een ronde'))
     ]);
     root.appendChild(screen);
     later(function () { speak(moText); }, 250);

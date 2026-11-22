@@ -138,6 +138,26 @@ async function installation(browser,base){
  if(name==='android'){await page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{window.promptUsed=true;};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e);});await page.getByRole('button',{name:'Installeer Tafelberg',exact:true}).click();assert(await page.evaluate(()=>window.promptUsed));await page.getByText('Klaar! Je vindt Tafelberg op je beginscherm.').waitFor();}
  await page.screenshot({path:`test-results/screens/install-${name}.png`});await c.close();}
 }
+async function beyondTables(browser,base){
+ const page=await browser.newPage({viewport:{width:375,height:667}});
+ try{
+  await page.goto(base);await seed(page);
+  await page.evaluate(()=>{delete Tafelberg.profile().facts['10x10'];Tafelberg.go('home');});
+  const next=page.getByRole('button',{name:/Verder na Tafelberg/});
+  assert.equal(await next.count(),0);
+  await page.evaluate(()=>{Tafelberg.profile().facts['10x10']={b:4};Tafelberg.go('home');});
+  await next.click();
+  assert.equal(await page.getByRole('link',{name:'Verder in RekenRinkel'}).getAttribute('href'),'https://rekenrinkel.onrender.com/#tafelberg');
+  await page.getByRole('button',{name:'Oefen grotere sommen'}).click();
+  const input=page.getByRole('textbox',{name:'Uitkomst'});
+  const submit=page.getByRole('button',{name:'Controleer'});
+  await input.fill('5');await submit.click();await page.getByText(/Probeer opnieuw/).waitFor();
+  for(const answer of [44,72,96,95,147,162,121,132,144]){
+   await input.fill(String(answer));await submit.click();
+  }
+  await page.getByRole('heading',{name:'Grotere sommen gelukt!'}).waitFor();
+ }finally{await page.close();}
+}
 async function functional(browser,base){
  const c=await browser.newContext({viewport:{width:393,height:852},userAgent:'Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36'});const p=await c.newPage();await p.goto(base);await seed(p);
  // Systeemterugknop; de ronde gaat terug naar haar tafel en daarna naar huis.
@@ -150,7 +170,7 @@ async function functional(browser,base){
  const apk=await c.newPage();await apk.addInitScript(()=>{window.AndroidStore={get:()=>null,set:()=>{window.savedAndroid=true;}};});await apk.goto('file://'+path.resolve('app/src/main/assets/www/index.html'));await seed(apk);assert(await apk.evaluate(()=>window.savedAndroid));assert.equal(await apk.locator('link[rel="manifest"]').count(),0);assert.equal(await apk.evaluate(()=>!!window.TBWeb),false);await c.close();
 }
 (async()=>{fs.mkdirSync('test-results/screens',{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;const base=`http://127.0.0.1:${port}/tafelberg/`;
- try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await changingViewport(b,type,base);await voiceAndCopies(b,base);await parentHistory(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
+ try{for(const [type,engine] of [['chromium',chromium],['webkit',webkit]].filter(v=>!process.env.TB_TEST_ENGINE||v[0]===process.env.TB_TEST_ENGINE)){const launch={headless:true};if(type==='chromium'&&process.env.TB_LITE_BROWSER){const lite=require('@sparticuz/chromium');launch.executablePath=path.resolve(process.env.TB_CHROMIUM_EXECUTABLE||'.test-browsers/lite/chromium');launch.args=['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader'];}const b=await engine.launch(launch);try{await matrix(b,type,base);await safeAreas(b,type,base);await changingViewport(b,type,base);await voiceAndCopies(b,base);await parentHistory(b,base);await beyondTables(b,base);await installation(b,base);if(type==='chromium')await functional(b,base);}finally{await b.close();}}}
  finally{server.close();fs.writeFileSync('test-results/layout.json',JSON.stringify({results,failures,errors},null,2));}
  console.log(JSON.stringify({screens:results.length,failures:failures.length,errors},null,2));if(failures.length){console.log(JSON.stringify(failures.slice(0,20),null,2));process.exitCode=1;}if(errors.length)process.exitCode=1;
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

@@ -3,6 +3,10 @@ package be.tafelberg.app;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.net.Uri;
+import android.widget.Toast;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -96,6 +100,15 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                // Open het vervolg in de browser, buiten de WebView met Android-bruggen.
+                if (url != null && url.matches("https://rekenrinkel[.]onrender[.]com/#tafelberg(=p[a-zA-Z0-9]{1,100})?")) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    } catch (ActivityNotFoundException e) {
+                        Toast.makeText(MainActivity.this, "Open RekenRinkel in je browser.", Toast.LENGTH_LONG).show();
+                    }
+                    return true;
+                }
                 // Het spel blijft binnen zijn eigen bestanden.
                 return url == null || !url.startsWith("file:///android_asset/");
             }

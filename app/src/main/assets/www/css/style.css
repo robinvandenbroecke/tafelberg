@@ -1578,3 +1578,6 @@ html.phone .who-main > .btn { font-size: 1rem; min-height: 44px; margin-top: 6px
 .parent-number { font-size: 1.35rem; font-weight: 800; overflow-wrap: anywhere; word-break: break-word; line-height: 1.5; }
 .parent-control .cloud-card { padding-bottom: 1.25rem; }
 .parent-control .cloud-field input { min-height: 44px; }
+
+.beyond-card a.btn { text-align: center; text-decoration: none; }
+.beyond-card .name-input { min-height: 44px; }
